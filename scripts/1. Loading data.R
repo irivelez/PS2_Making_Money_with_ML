@@ -114,6 +114,3 @@ combine_chapinero <- st_crop(combine, chapinero)
 leaflet() %>% addTiles() %>% addCircles(data=combine_chapinero) %>% addPolygons(data = chapinero, col = "red")
 available_features()
 available_tags("amenity")
-
-
-
