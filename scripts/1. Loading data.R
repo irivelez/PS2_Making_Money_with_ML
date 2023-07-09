@@ -14,7 +14,6 @@
 
 ### Initial Configuration
 rm(list = ls())
-setwd("C:/Users/Daniel Casas/OneDrive - Universidad de los Andes/Escritorio/DANIEL CASAS/MEcA/Clases/Big data and machine learning/Talleres/Taller 2/Base de Kaggle")
 
 ## llamado librerías de la sesión
 require(pacman)
@@ -29,18 +28,22 @@ p_load(tidyverse,rio,
        rgeos)
 
 
-### Importamos los datos en formato CSV y los convertimos a formato RDS
+### Importamos los datos desde Github en formato CSV y los convertimos a formato RDS
 
 #Para test
-test <- read.csv("test.csv")
+url_test <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/test.csv"
+test <- read.csv(url_test)
 saveRDS(test, "test.rds")
 
+
 #Para train
-train <- read.csv("train.csv")
+url_train <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/train.csv"
+train <- read.csv(url_train)
 saveRDS(train, "train.rds")
 
 #Para submission_template
-submission_template <- read.csv("submission_template.csv")
+url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
+submission_template <- read.csv(url_submission_template)
 saveRDS(submission_template, "submission_template.rds")
 
 
@@ -72,29 +75,45 @@ combine <- bind_rows(train,test) %>% st_as_sf(coords=c("lon","lat"),crs=4326)
 class(combine)
 
 
+##########################################################################
 #Utilizaremos únicamente datos para los apartamentos ubicados en Chapinero
+##########################################################################
 
-#Creamos el mapa con leaflet
+
+#Creamos el mapa interactivo con la biblioteca leaflet agregando círculos 
+#a partir de las coordenadas de datos de nuestra base "combine"
+
 leaflet() %>% addTiles() %>% addCircles(data=combine)
 str(combine)
 
-#Definimos las zonas a analizar
+
+#Definimos las zonas a analizar mediante el código getbb del paquete osmdata
+#que nos da los límites geoespaciales para de la UPZ Chapinero en un formato
+#espacial (sf); además, el multipolygon extrae los polígonos de la respuesta 
+#y los asigna a la variable que hemos llamado chapinero.
+
 chapinero <- getbb(place_name = "UPZ Chapinero, Bogota", 
                    featuretype = "boundary:administrative", 
                    format_out = "sf_polygon") %>% .$multipolygon
 
 
+#Aquí creamos el mapa solo de Chapinero con los datos de la variable que creamos
 leaflet() %>% addTiles() %>% addPolygons(data= chapinero, col = "red")
 st_crs(combine)
 st_crs(chapinero)
 
-
-
+#Esto transforma la variable chapinero para que coincida con el CRS de combine
 chapinero <- st_transform(chapinero,st_crs(combine))
+
+#Creamos un objeto llamado combine_chapinero que contiene solo los datos de
+#combine que se encuentran en Chapinero
 combine_chapinero <- combine[chapinero,]
 combine_chapinero <- st_crop(combine, chapinero)
 
+#Aquí se verán juntas las áreas
 leaflet() %>% addTiles() %>% addCircles(data=combine_chapinero) %>% addPolygons(data = chapinero, col = "red")
 available_features()
 available_tags("amenity")
+
+
 
