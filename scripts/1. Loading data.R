@@ -114,3 +114,84 @@ combine_chapinero <- st_crop(combine, chapinero)
 leaflet() %>% addTiles() %>% addCircles(data=combine_chapinero) %>% addPolygons(data = chapinero, col = "red")
 available_features()
 available_tags("amenity")
+
+
+### Aquí la idea es crear algunas variables que identifiquemos de la base de datos y nos puedan
+### servir como controles para la predicción. El truco es extraer el texto de description para
+### convertir ese texto en variable. El problem set nos pide dos variables de las bases de datos
+### y cuatro variables que tendremos que sacar de otro lado
+
+### Variable número 1: Parqueadero
+Descripc <- combine_chapinero$description
+parqueaderoT_aux1<-str_detect( Descripc,"parqueadero")
+parqueaderoT_aux2<-str_detect( Descripc,"parqueaderos") 
+parqueaderoT_aux3<-str_detect( Descripc,"parqeadero") 
+parqueaderoT_aux4<-str_detect( Descripc,"parqeaderos") 
+parqueaderoT_aux5<-str_detect( Descripc,"garaje") 
+parqueaderoT_aux6<-str_detect( Descripc,"garajes") 
+parqueaderoT_aux7<-str_detect( Descripc,"garage") 
+parqueaderoT_aux8<-str_detect( Descripc,"garages") 
+parqueaderoT_aux9<-str_detect( Descripc,"garjes") 
+parqueaderoT_aux10<-str_detect( Descripc,"garje") 
+parqueaderoT<-ifelse(parqueaderoT_aux1==TRUE|parqueaderoT_aux2==TRUE| parqueaderoT_aux3==TRUE|parqueaderoT_aux4==TRUE|parqueaderoT_aux5==TRUE|parqueaderoT_aux6==TRUE|parqueaderoT_aux7==TRUE|parqueaderoT_aux8==TRUE|parqueaderoT_aux9 == TRUE |parqueaderoT_aux10==TRUE , 1,0 )
+parqueaderoT<-data.frame(parqueaderoT)
+summary(parqueaderoT)
+parqueaderoT[is.na(parqueaderoT)] = 0 #Se imputa cero a los datos NA, porque existen datos donde no había descripción
+summary(parqueaderoT)
+combine_chapinero <- cbind(combine_chapinero, parqueaderoT)
+# Contar el número de veces que la variable toma el valor de "1"
+count_ascensor <- sum(combine_chapinero$ascensorT == 1)
+count_ascensor   ###2312 de 11222 hogares tienen ascensor (21%)
+  
+### Variable número 2: Parqueadero
+ascensorT_aux1<-str_detect( Descripc,"ascensor")
+ascensorT_aux2<-str_detect( Descripc,"acensor") 
+ascensorT_aux3<-str_detect( Descripc,"asensor") 
+ascensorT_aux4<-str_detect( Descripc,"elevador") 
+ascensorT_aux5<-str_detect( Descripc,"ascensores") 
+ascensorT_aux6<-str_detect( Descripc,"acensores") 
+ascensorT_aux7<-str_detect( Descripc,"asensores") 
+ascensorT_aux8<-str_detect( Descripc,"elevadores") 
+ascensorT<-ifelse(ascensorT_aux1==TRUE|ascensorT_aux2==TRUE| ascensorT_aux3==TRUE|ascensorT_aux4==TRUE|ascensorT_aux5==TRUE|ascensorT_aux6==TRUE|ascensorT_aux7==TRUE|ascensorT_aux8==TRUE, 1,0 )
+ascensorT<-data.frame(ascensorT)
+summary(ascensorT)
+ascensorT[is.na(ascensorT)] = 0 #Se imputa cero a los datos NA, porque existen datos donde no había descripción
+summary(ascensorT)
+combine_chapinero <- cbind(combine_chapinero, ascensorT)
+count_parking <- sum(combine_chapinero$parqueaderoT == 1)
+count_parking   ###7733 de 11222 hogares tienen ascensor (69%)
+
+
+### Variable número 3: Baño privado
+bañoprivado_aux1 <-str_detect( Descripc,"bano privado")
+bañoprivado_aux2 <-str_detect( Descripc,"baño privado")
+bañoprivado <-ifelse(bañoprivado_aux1==TRUE|bañoprivado_aux2==TRUE, 1,0 )
+bañoprivado <-data.frame(bañoprivado)
+summary(bañoprivado)
+bañoprivado[is.na(bañoprivado)] = 0 #Se imputa cero a los datos NA, porque existen datos donde no había descripción
+summary(bañoprivado)
+combine_chapinero <- cbind(combine_chapinero, bañoprivado)
+count_baño <- sum(combine_chapinero$bañoprivado == 1)
+count_baño   ###1251 de 11222 hogares tienen ascensor (11%)
+
+
+### Variable número 4: Balcón/terraza
+balcon_aux1 <-str_detect( Descripc,"balcon")
+balcon_aux2 <-str_detect( Descripc,"balcón")
+balcon_aux3 <-str_detect( Descripc,"terraza")
+balcon_aux4 <-str_detect( Descripc,"mirador")
+balcon_aux5 <-str_detect( Descripc,"azotea")
+balcon_aux6 <-str_detect( Descripc,"asotea")
+balcon_aux7 <-str_detect( Descripc,"cornisa")
+balcon_aux8 <-str_detect( Descripc,"corniza")
+balcon_aux9 <-str_detect( Descripc,"corniza")
+balcon <-ifelse(balcon_aux1==TRUE|balcon_aux2==TRUE| balcon_aux3==TRUE|balcon_aux4==TRUE|balcon_aux5==TRUE|balcon_aux6==TRUE|balcon_aux7==TRUE|balcon_aux8==TRUE|balcon_aux9==TRUE, 1,0 )
+balcon <-data.frame(balcon)
+summary(balcon)
+balcon[is.na(balcon)] = 0 #Se imputa cero a los datos NA, porque existen datos donde no había descripción
+summary(balcon)
+combine_chapinero <- cbind(combine_chapinero, balcon)
+count_balcon <- sum(combine_chapinero$balcon == 1)
+count_balcon   ###4997 de 11222 hogares tienen ascensor (45%)
+
+
