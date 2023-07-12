@@ -88,7 +88,7 @@ str(combine)
 
 
 #Definimos las zonas a analizar mediante el código getbb del paquete osmdata
-#que nos da los límites geoespaciales para de la UPZ Chapinero en un formato
+#que nos da los límites geoespaciales para de las UPZ Chapinero en un formato
 #espacial (sf); además, el multipolygon extrae los polígonos de la respuesta 
 #y los asigna a la variable que hemos llamado chapinero.
 
@@ -194,4 +194,13 @@ combine_chapinero <- cbind(combine_chapinero, balcon)
 count_balcon <- sum(combine_chapinero$balcon == 1)
 count_balcon   ###4997 de 11222 hogares tienen ascensor (45%)
 
+### Apartir de las variables creadas anteriormente, a continuación nos remitimos a crear los cuatro predictores
+### de fuentes externas, esto con el propósito de añadir determinantes a la vivienda. 
+
+##Creación de la variable distancia de parques a observaciones.
+#Cargamos la base de datos geoespaciales de parques.
+
+library(sf)
+datos_sf <- st_read("/Users/luciafillippo/Downloads/parque.gpkg")
+plot(datos_sf$SHAPE)
 
