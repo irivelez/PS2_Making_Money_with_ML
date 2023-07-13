@@ -342,6 +342,8 @@ Tabla_prop
 # External data -----------------------------------------------------------
 available_tags("leisure")
 # TODO A : combine_chapinero
+
+
 # ### Variable número 1: Distancia al parque ####
 
 parques <- opq(bbox = getbb("Bogota Colombia")) %>%
