@@ -82,7 +82,7 @@ combine <- bind_rows(train,test) %>% st_as_sf(coords=c("lon","lat"),crs=4326)
 class(combine)
 
 
-# View data ---------------------------------------------------------------
+# View data 1 ---------------------------------------------------------------
 
 ## Datos en general
 glimpse(train)
@@ -344,7 +344,7 @@ available_tags("leisure")
 # TODO A : combine_chapinero
 
 
-# ### Variable número 1: Distancia al parque ####
+#### Variable número 1: Distancia al parque ####
 
 parques <- opq(bbox = getbb("Bogota Colombia")) %>%
   add_osm_feature(key = "leisure" , value = "park") 
@@ -362,24 +362,30 @@ leaflet() %>%
   addCircles(lng = centroides$x, 
              lat = centroides$y, 
              col = "red", opacity = 1, radius = 1)
+
 # Ahora vamos a calcular la distancia de cada apartamento al centroide de cada parque
-db_sf <- st_as_sf(db, coords = c("lon", "lat"))
-st_crs(db_sf) <- 4326
+combine_chapinero_sf <- st_as_sf(combine_chapinero, coords = c("lon", "lat"))
+st_crs(combine_chapinero_sf) <- 4326
 centroides_sf <- st_as_sf(centroides, coords = c("x", "y"))
 # Esto va a ser demorado!
-dist_matrix <- st_distance(x = db_sf, y = centroides_sf)
+dist_matrix <- st_distance(x = combine_chapinero_sf, y = centroides_sf)
 
 # Encontramos la distancia mínima a un parque
 dist_min <- apply(dist_matrix, 1, min)
-db$distancia_parque <- dist_min
-db_sf$distancia_parque <- dist_min
+combine_chapinero$distancia_parque <- dist_min
+combine_chapinero_sf$distancia_parque <- dist_min
 
-p <- ggplot(db, aes(x = distancia_parque)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a un parque en metros", y = "Cantidad",
-       title = "Distribución de la distancia a los parques") +
-  theme_bw()
-ggplotly(p)
+
+
+#### Variable número 2: Area del parque ####
+# Ahora vamos a evaluar si el tamaño del parque más cercano influye
+posicion <- apply(dist_matrix, 1, function(x) which(min(x) == x))
+areas <- st_area(parques_geometria)
+combine_chapinero$area_parque <- areas[posicion]
+combine_chapinero$area_parque <- as.numeric(combine_chapinero$area_parque)
+combine_chapinero_sf$area_parque <- areas[posicion]
+combine_chapinero_sf$area_parque <- as.numeric(combine_chapinero_sf$area_parque)
+
 
 
 
