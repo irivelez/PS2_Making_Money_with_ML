@@ -201,6 +201,10 @@ count_balcon   ###4997 de 11222 hogares tienen ascensor (45%)
 #Cargamos la base de datos geoespaciales de parques.
 
 library(sf)
-datos_sf <- st_read("/Users/luciafillippo/Downloads/parque.gpkg")
+datos_sf <- st_read("/Users/luciafillippo/Library/CloudStorage/OneDrive-UniversidaddelosAndes/Big Data & Machine Learning/Problem Sets/Problem Set II/PS2_Making_Money_with_ML/stores/Ciclorruta.gpkg")
 plot(datos_sf$SHAPE)
 
+#Cargamos la base de datos geoespaciales de parques.
+library(sf)
+datos_cl <- st_read ("/Users/luciafillippo/Library/CloudStorage/OneDrive-UniversidaddelosAndes/Big Data & Machine Learning/Problem Sets/Problem Set II/PS2_Making_Money_with_ML/stores/parque.gpkg")
+plot(datos_cl$SHAPE)
