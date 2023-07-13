@@ -363,11 +363,11 @@ leaflet() %>%
              lat = centroides$y, 
              col = "red", opacity = 1, radius = 1)
 
-# Ahora vamos a calcular la distancia de cada apartamento al centroide de cada parque
+# Ahora vamos a calcular la distancia de cada casa al centroide de cada parque
 combine_chapinero_sf <- st_as_sf(combine_chapinero, coords = c("lon", "lat"))
 st_crs(combine_chapinero_sf) <- 4326
 centroides_sf <- st_as_sf(centroides, coords = c("x", "y"))
-# Esto va a ser demorado!
+
 dist_matrix <- st_distance(x = combine_chapinero_sf, y = centroides_sf)
 
 # Encontramos la distancia mínima a un parque
@@ -375,20 +375,37 @@ dist_min <- apply(dist_matrix, 1, min)
 combine_chapinero$distancia_parque <- dist_min
 combine_chapinero_sf$distancia_parque <- dist_min
 
-
-
 #### Variable número 2: Area del parque ####
-# Ahora vamos a evaluar si el tamaño del parque más cercano influye
-posicion <- apply(dist_matrix, 1, function(x) which(min(x) == x))
+posicion <- apply(dist_matrix, 1, function(x) which.min(x))
 areas <- st_area(parques_geometria)
 combine_chapinero$area_parque <- areas[posicion]
 combine_chapinero$area_parque <- as.numeric(combine_chapinero$area_parque)
 combine_chapinero_sf$area_parque <- areas[posicion]
 combine_chapinero_sf$area_parque <- as.numeric(combine_chapinero_sf$area_parque)
 
+#### Variable número 3: Sport centre ####
+sport_centre <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "leisure" , value = "sports_centre") 
+sport_centre_sf <- osmdata_sf(sport_centre)
+sport_centre_geometria <- sport_centre_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+# Calculamos la matriz de distancias entre los apartamentos y los centros deportivos
+dist_matrix_sport_centre <- st_distance(x = combine_chapinero_sf, y = sport_centre_geometria)
+
+# Encontramos la distancia mínima a un centro deportivo
+dist_min_sport_centre <- apply(dist_matrix_sport_centre, 1, min)
+
+# Añadimos la columna de distancia al centro deportivo al dataframe combine_chapinero
+combine_chapinero$distancia_sport_centre <- dist_min_sport_centre
+combine_chapinero_sf$distancia_sport_centre <- dist_min_sport_centre
 
 
 
+
+
+
+# Grupos ------------------------------------------------------------------
 
 
 # Como se juntaron las bases train y tes, luego se filtraron los datos  que solo son de chapinero
