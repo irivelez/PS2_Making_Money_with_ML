@@ -12,7 +12,8 @@
 #- Daniel Casas Bautista  
     
 
-### Initial Configuration
+# Initial configuration ---------------------------------------------------
+
 rm(list = ls())
 
 ## llamado librerías de la sesión
@@ -28,24 +29,31 @@ p_load(tidyverse,rio,
        rgeos)
 
 
+# Import data -------------------------------------------------------------
+
 ### Importamos los datos desde Github en formato CSV y los convertimos a formato RDS
 
 #Para test
 url_test <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/test.csv"
 test <- read.csv(url_test)
 saveRDS(test, "test.rds")
-
+summary(test)
+head(test)
 
 #Para train
 url_train <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/train.csv"
 train <- read.csv(url_train)
 saveRDS(train, "train.rds")
+summary(train)
+head(train)
 
 #Para submission_template
 url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
 submission_template <- read.csv(url_submission_template)
 saveRDS(submission_template, "submission_template.rds")
 
+
+# Clean data --------------------------------------------------------------
 
 ### Habiendo cargado la base de datos, debemos limpiarla de mayúsculas y tildes para luego combinarlas
 
@@ -69,15 +77,21 @@ test$description <- str_replace_all(test$description, "[^[:alnum:]]", " ")
 train$description <- gsub("\\s+", " ", str_trim(train$description))
 test$description <- gsub("\\s+", " ", str_trim(test$description))
 
-
-#Combinar columnas
+# Base final 
 combine <- bind_rows(train,test) %>% st_as_sf(coords=c("lon","lat"),crs=4326)
 class(combine)
 
 
-##########################################################################
-#Utilizaremos únicamente datos para los apartamentos ubicados en Chapinero
-##########################################################################
+# View data ---------------------------------------------------------------
+
+## Variable de interes (precio)
+ggplot(train, aes(x = price)) +
+  geom_histogram(fill = "darkblue") +
+  theme_bw() +
+  labs(x = "Precio de arriendo", y = "Cantidad")
+
+
+# Ubicacion Chapinero -----------------------------------------------------
 
 
 #Creamos el mapa interactivo con la biblioteca leaflet agregando círculos 
@@ -115,6 +129,9 @@ leaflet() %>% addTiles() %>% addCircles(data=combine_chapinero) %>% addPolygons(
 available_features()
 available_tags("amenity")
 
+
+
+# Description data --------------------------------------------------------
 
 ### Aquí la idea es crear algunas variables que identifiquemos de la base de datos y nos puedan
 ### servir como controles para la predicción. El truco es extraer el texto de description para
@@ -193,5 +210,12 @@ summary(balcon)
 combine_chapinero <- cbind(combine_chapinero, balcon)
 count_balcon <- sum(combine_chapinero$balcon == 1)
 count_balcon   ###4997 de 11222 hogares tienen ascensor (45%)
+
+
+# External data -----------------------------------------------------------
+
+# 
+
+
 
 
