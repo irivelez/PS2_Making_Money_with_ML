@@ -400,14 +400,30 @@ dist_min_sport_centre <- apply(dist_matrix_sport_centre, 1, min)
 combine_chapinero$distancia_sport_centre <- dist_min_sport_centre
 combine_chapinero_sf$distancia_sport_centre <- dist_min_sport_centre
 
+#### Variable número 4: amusement_arcade ####
+amusement_arcade <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "amenity" , value = "amusement_arcade") 
+amusement_arcade_sf <- osmdata_sf(amusement_arcade)
+amusement_arcade_geometria <- amusement_arcade_sf$osm_points %>% 
+  select(osm_id, name)
+
+# Calculamos la matriz de distancias entre los apartamentos y los arcades de entretenimiento
+dist_matrix_amusement_arcade <- st_distance(x = combine_chapinero_sf, y = amusement_arcade_geometria)
+
+# Encontramos la distancia mínima a un arcade de entretenimiento
+dist_min_amusement_arcade <- apply(dist_matrix_amusement_arcade, 1, min)
+
+# Añadimos la columna de distancia al arcade de entretenimiento al dataframe combine_chapinero
+combine_chapinero$distancia_amusement_arcade <- dist_min_amusement_arcade
+combine_chapinero_sf$distancia_amusement_arcade <- dist_min_amusement_arcade
+
+
 
 
 
 
 
 # Grupos ------------------------------------------------------------------
-
-
 # Como se juntaron las bases train y tes, luego se filtraron los datos  que solo son de chapinero
 # y se añadieron nuevas variables; para entrenar los modelos es necesario tener divididos el grupo
 # de entrenamiento y de control nuevamente. Por lo cual debemos realizar nuevamente esta división:
