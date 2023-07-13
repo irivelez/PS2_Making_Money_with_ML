@@ -93,7 +93,7 @@ glimpse(train)
 ggplot(train, aes(x = price)) +
   geom_histogram(fill = "darkblue") +
   theme_bw() +
-  labs(x = "Precio de arriendo", y = "Cantidad")
+  labs(x = "Precio de venta", y = "Cantidad")
 
 ## ## Descriptivas - Variable de interes (precio)
 summary(train$price) %>%
@@ -174,7 +174,7 @@ paste("El",prop_parking, "%", "de apartamentos tienen parqueadero")
 rm(parqueaderoT_aux1,parqueaderoT_aux2,parqueaderoT_aux3,parqueaderoT_aux4,
    parqueaderoT_aux5,parqueaderoT_aux6,parqueaderoT_aux7,parqueaderoT_aux8,
    parqueaderoT_aux9,parqueaderoT_aux10)
-
+rm(parqueaderoT)
 
 ### Variable número 2: Elevador ####
 ascensorT_aux1<-str_detect( Descripc,"ascensor")
@@ -200,6 +200,7 @@ paste("El",prop_ascensor, "%", "de apartamentos tienen ascensor")
 # Limpiar ambiente
 rm(ascensorT_aux1,ascensorT_aux2,ascensorT_aux3,ascensorT_aux4,
    ascensorT_aux5,ascensorT_aux6,ascensorT_aux7,ascensorT_aux8)
+rm(ascensorT)
 
 ### Variable número 3: Baño privado ####
 bañoprivado_aux1 <-str_detect( Descripc,"bano privado")
@@ -216,7 +217,7 @@ paste("El",prop_bano, "%", "de apartamentos tienen baño privado")
 
 # Limpiar ambiente
 rm(bañoprivado_aux1,bañoprivado_aux2)
-
+rm(bañoprivado)
 
 ### Variable número 4: Balcón/terraza ####
 balcon_aux1 <-str_detect( Descripc,"balcon")
@@ -243,7 +244,7 @@ paste("El",prop_balcon, "%", "de apartamentos tienen balcón")
 # Limpiar ambiente
 rm(balcon_aux1,balcon_aux2,balcon_aux3,balcon_aux4,balcon_aux5,balcon_aux6,
    balcon_aux7,balcon_aux8,balcon_aux9)
-
+rm(balcon)
 
 ### Variable número 5: Vista ####
 vista_aux1 <-str_detect( Descripc,"vista")
@@ -259,7 +260,7 @@ paste("El",prop_vista, "%", "de apartamentos tienen vista")
 
 # Limpiar ambiente
 rm(vista_aux1)
-
+rm(vista)
 
 ### Variable número 6: Remodelado ####
 remod_aux1 <-str_detect( Descripc,"remodelado")
@@ -288,6 +289,7 @@ paste("El",prop_remod, "%", "de apartamentos está remodelado")
 # Limpiar ambiente
 rm(remod_aux1,remod_aux2,remod_aux3,remod_aux4,remod_aux5,remod_aux6,
    remod_aux7,remod_aux8,remod_aux9,remod_aux10,remod_aux11)
+rm(remodelado)
 
 ### Variable número 7: Admon incluida  ####
 admon_aux1 <-str_detect( Descripc,"administracion incluida")
@@ -309,6 +311,23 @@ paste("El",prop_admon, "%", "de apartamentos incluyen administración")
 
 # Limpiar ambiente
 rm(admon_aux1,admon_aux2,admon_aux3,admon_aux4,admon_aux5,admon_aux6)
+rm(admon)
+
+
+### Variable número 8: Metros cuadrados  ####
+combine_chapinero <- combine_chapinero %>%
+  mutate(MetrosCuadrados = as.numeric(str_extract(description, "\\d+(?=\\s*(?:metros cuadrados|m²|m2|mts2?|mt2|m\\^2|mtrs2?|mtrs))|(?<!\\d)0")))
+combine_chapinero$MetrosCuadrados[is.na(combine_chapinero$MetrosCuadrados)] = 0
+
+### Variable número 9: Casa/apartamento  ####
+combine_chapinero$Es_apartamento <- ifelse(combine_chapinero$property_type == "Apartamento", 1, 0)
+table(combine_chapinero$Es_apartamento)
+
+### Variable número 10: Baños corregido  ####
+combine_chapinero$NumeroBanos <- as.numeric(str_extract(combine_chapinero$description, "\\d+(?:\\.\\d+)?(?=\\s*(?:bano|banos))"))
+# combinar variable baño
+combine_chapinero <- combine_chapinero %>%
+  mutate(bathrooms = ifelse(is.na(bathrooms), NumeroBanos, bathrooms))
 
 
 ### Tabla de proporciones final ####
@@ -320,13 +339,45 @@ valores <- c(prop_parking, prop_ascensor,prop_bano,prop_balcon,prop_vista,
 Tabla_prop <- data.frame(Descripcion = nombres, Proporcion = valores)
 Tabla_prop
 
-
-
-
-
 # External data -----------------------------------------------------------
+available_tags("leisure")
+# TODO A : combine_chapinero
+# ### Variable número 1: Distancia al parque ####
 
-# 
+parques <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "leisure" , value = "park") 
+parques_sf <- osmdata_sf(parques)
+parques_geometria <- parques_sf$osm_polygons %>% 
+  select(osm_id, name)
+
+# Calculamos el centroide de cada parque
+centroides <- gCentroid(as(parques_geometria$geometry, "Spatial"), byid = T)
+
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data = parques_geometria, col = "green",
+              opacity = 0.8, popup = parques_geometria$name) %>%
+  addCircles(lng = centroides$x, 
+             lat = centroides$y, 
+             col = "red", opacity = 1, radius = 1)
+# Ahora vamos a calcular la distancia de cada apartamento al centroide de cada parque
+db_sf <- st_as_sf(db, coords = c("lon", "lat"))
+st_crs(db_sf) <- 4326
+centroides_sf <- st_as_sf(centroides, coords = c("x", "y"))
+# Esto va a ser demorado!
+dist_matrix <- st_distance(x = db_sf, y = centroides_sf)
+
+# Encontramos la distancia mínima a un parque
+dist_min <- apply(dist_matrix, 1, min)
+db$distancia_parque <- dist_min
+db_sf$distancia_parque <- dist_min
+
+p <- ggplot(db, aes(x = distancia_parque)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a un parque en metros", y = "Cantidad",
+       title = "Distribución de la distancia a los parques") +
+  theme_bw()
+ggplotly(p)
 
 
 
@@ -344,7 +395,7 @@ Train_combine <- combine_chapinero[!filtro, ]
 ggplot(Train_combine, aes(x = price)) +
   geom_histogram(fill = "darkblue") +
   theme_bw() +
-  labs(x = "Precio de arriendo", y = "Cantidad")
+  labs(x = "Precio de venta", y = "Cantidad")
 
 #Descriptivas - Variable de interes (precio)
 summary(Train_combine$price) %>%
