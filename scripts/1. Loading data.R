@@ -128,24 +128,19 @@ chapinero <- getbb(place_name = "UPZ Chapinero, Bogota",
                    featuretype = "boundary:administrative", 
                    format_out = "sf_polygon") %>% .$multipolygon
 
-
 #Aquí creamos el mapa solo de Chapinero con los datos de la variable que creamos
-leaflet() %>% addTiles() %>% addPolygons(data= chapinero, col = "red")
-st_crs(combine)
-st_crs(chapinero)
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(data= chapinero, col = "red")
 
-#Esto transforma la variable chapinero para que coincida con el CRS de combine
-chapinero <- st_transform(chapinero,st_crs(combine))
+# Restringir a Chapinero
+combine_chapinero <- st_intersection(x = combine, y = chapinero)
 
-#Creamos un objeto llamado combine_chapinero que contiene solo los datos de
-#combine que se encuentran en Chapinero
-combine_chapinero <- combine[chapinero,]
-combine_chapinero <- st_crop(combine, chapinero)
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(data = chapinero , col = "red") %>%
+  addCircles(data = house_chapi)
 
-#Aquí se verán juntas las áreas
-leaflet() %>% addTiles() %>% addCircles(data=combine_chapinero) %>% addPolygons(data = chapinero, col = "red")
-available_features()
-available_tags("amenity")
 
 sum(is.na(combine_chapinero$price))
 sum(!is.na(combine_chapinero$price))
@@ -318,33 +313,7 @@ rm(remod_aux1,remod_aux2,remod_aux3,remod_aux4,remod_aux5,remod_aux6,
 rm(remodelado)
 
 
-
-
-### Variable número 7: Admon incluida  ####
-admon_aux1 <-str_detect( Descripc,"administracion incluida")
-admon_aux2 <-str_detect( Descripc,"admon incluida")
-admon_aux3 <-str_detect( Descripc,"incluye administracion")
-admon_aux4 <-str_detect( Descripc,"incluye admon")
-admon_aux5 <-str_detect( Descripc,"administracion cubierta")
-admon_aux6 <-str_detect( Descripc,"administracion cubiertos")
-admon <-ifelse(admon_aux1==TRUE|admon_aux2==TRUE|admon_aux3==TRUE|admon_aux4==TRUE|
-                 admon_aux5==TRUE|admon_aux6==TRUE, 1,0 )
-admon <-data.frame(admon)
-summary(admon)
-admon[is.na(admon)] = 0 #Se imputa cero a los datos NA, porque existen datos donde no había descripción
-summary(admon)
-combine_chapinero <- cbind(combine_chapinero, admon)
-# Contar
-prop_admon <- round(sum(combine_chapinero$admon == 1)/nrow(combine_chapinero)*100,1)
-paste("El",prop_admon, "%", "de apartamentos incluyen administración")
-
-# Limpiar ambiente
-rm(admon_aux1,admon_aux2,admon_aux3,admon_aux4,admon_aux5,admon_aux6)
-rm(admon)
-
-
-
-### Variable número 8: Metros cuadrados  ####
+### Variable número 7: Metros cuadrados  ####
 combine_chapinero <- combine_chapinero %>%
   mutate(MetrosCuadrados = as.numeric(str_extract(description, "\\d+(?=\\s*(?:metros cuadrados|m²|m2|mts2?|mt2|m\\^2|mtrs2?|mtrs))|(?<!\\d)0")))
 combine_chapinero$MetrosCuadrados[is.na(combine_chapinero$MetrosCuadrados)] = 0
@@ -364,11 +333,12 @@ combine_chapinero$surface_covered_new <- ifelse(combine_chapinero$surface_covere
 
 
 
-### Variable número 9: Casa/apartamento  ####
+### Variable número 8: Casa/apartamento  ####
 combine_chapinero$Es_apartamento <- ifelse(combine_chapinero$property_type == "Apartamento", 1, 0)
 table(combine_chapinero$Es_apartamento)
 
-### Variable número 10: Baños corregido  ####
+
+### Variable número 9: Baños corregido  ####
 combine_chapinero$NumeroBanos <- as.numeric(str_extract(combine_chapinero$description, "\\d+(?:\\.\\d+)?(?=\\s*(?:bano|banos))"))
 # combinar variable baño
 combine_chapinero <- combine_chapinero %>%
@@ -377,9 +347,9 @@ combine_chapinero <- combine_chapinero %>%
 
 ### Tabla de proporciones final ####
 nombres <- c("Parqueadero", "Elevador","Baño privado", "Balcón","Vista",
-             "Remodelado","Admon incluida")
+             "Remodelado")
 valores <- c(prop_parking, prop_ascensor,prop_bano,prop_balcon,prop_vista,
-             prop_remod,prop_admon)
+             prop_remod)
 
 Tabla_prop <- data.frame(Descripcion = nombres, Proporcion = valores)
 Tabla_prop
@@ -471,12 +441,36 @@ combine_chapinero$distancia_swimming_pool <- dist_min_swimming_pool
 combine_chapinero_sf$distancia_swimming_pool <- dist_min_swimming_pool
 
 
-db <- combine_chapinero  %>% select(-city,-month,-year,-surface_total,-property_type,
-                               -operation_type,-title,-description,-geometry,-MetrosCuadrados,-NumeroBanos,
-                               -MetrosCuadrados_new)
+#### Variable número 5 REVISAR: Ciclo ruta ####
+library(sf)
+datos_sf <- st_read("../stores/Ciclorruta.gpkg")
+plot(datos_sf$SHAPE)
+
+# Transformar la capa de combine_chapinero_sf a la misma proyección que datos_sf
+combine_chapinero_sf <- st_transform(combine_chapinero_sf, st_crs(datos_sf))
+
+# Calcular la matriz de distancias entre los apartamentos y la cicloruta
+dist_matrix_cicloruta <- st_distance(x = combine_chapinero_sf, y = datos_sf)
+
+# Encontrar la distancia mínima a la cicloruta
+dist_min_cicloruta <- apply(dist_matrix_cicloruta, 1, min)
+
+# Añadir la columna de distancia a la cicloruta al dataframe combine_chapinero
+combine_chapinero$distancia_cicloruta <- dist_min_cicloruta
+combine_chapinero_sf$distancia_cicloruta <- dist_min_cicloruta
+
 
 
 # Save data ---------------------------------------------------------------
+# Principal data
+base_inicial <- combine_chapinero
+save(base_inicial, file = "../stores/base_inicial.Rdata")
+
+# Data base to model
+db <- combine_chapinero  %>% select(-city,-month,-year,-surface_total,-property_type,
+                                    -operation_type,-title,-description,-geometry,-MetrosCuadrados,
+                                    -NumeroBanos)
+
 save(db, file = "../stores/data.Rdata")
 
 
@@ -485,17 +479,4 @@ load("../stores/data.Rdata")
 
 
 
-### Apartir de las variables creadas anteriormente, a continuación nos remitimos a crear los cuatro predictores
-### de fuentes externas, esto con el propósito de añadir determinantes a la vivienda. 
 
-##Creación de la variable distancia de parques a observaciones.
-#Cargamos la base de datos geoespaciales de parques.
-
-library(sf)
-datos_sf <- st_read("/Users/luciafillippo/Library/CloudStorage/OneDrive-UniversidaddelosAndes/Big Data & Machine Learning/Problem Sets/Problem Set II/PS2_Making_Money_with_ML/stores/Ciclorruta.gpkg")
-plot(datos_sf$SHAPE)
-
-#Cargamos la base de datos geoespaciales de parques.
-library(sf)
-datos_cl <- st_read ("/Users/luciafillippo/Library/CloudStorage/OneDrive-UniversidaddelosAndes/Big Data & Machine Learning/Problem Sets/Problem Set II/PS2_Making_Money_with_ML/stores/parque.gpkg")
-plot(datos_cl$SHAPE)
