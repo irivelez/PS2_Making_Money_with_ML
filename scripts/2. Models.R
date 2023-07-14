@@ -43,9 +43,11 @@ load("../stores/data.Rdata")
 url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
 submission_template <- read.csv(url_submission_template)
 
-base <- left_join(submission_template, db, by = "property_id")
-base <- base %>% select(-price.y)
-base <-  base  %>%   drop_na(surface_covered_new) 
+base <- left_join(db, submission_template, by = "property_id")
+summary(base)
+
+base$price.x <- ifelse(is.na(base$price.x), base$price.y, base$price.x)
+summary(base)
 
 
 
@@ -61,6 +63,21 @@ sample <- sample(c(TRUE, FALSE), nrow(base), replace=TRUE, prob=c(0.7,0.3))
 sum(sample)/nrow(base)
 train  <- base[sample, ] 
 test   <- base[!sample, ] 
+
+
+# View data ---------------------------------------------------------------
+ggplot(train, aes(x = price.x)) +
+  geom_histogram(fill = "darkblue") +
+  theme_bw() +
+  labs(x = "Precio de venta", y = "Cantidad")
+
+# Descriptivas - Variable de interes (precio)
+summary(train$price.x) %>%
+  as.matrix() %>%
+  as.data.frame() %>%
+  mutate(V1 = scales::dollar(V1))
+
+
 
 # Models ------------------------------------------------------------------
 ## LM ####
@@ -203,8 +220,26 @@ ridge1$results$RMSE[which.min(ridge1$results$lambda)]
 ridge1$results$MAE[which.min(ridge1$results$lambda)]
 
 ## Lasso ####
+lasso<-train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+               parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+               Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+               distancia_swimming_pool,
+             data=base,
+             method = 'glmnet', 
+             trControl = fitControl,
+             tuneGrid = expand.grid(alpha = 1, #lasso
+                                    lambda = ridge0$lambda)
+) 
 
-  
+## Compare Ridge-Lasso
+RMSE_df <- cbind()
+
+
+
+
+
+
+
 # Reg 1 Lasso
 lasso_no_pen <- glmnet(
   x = X0,
