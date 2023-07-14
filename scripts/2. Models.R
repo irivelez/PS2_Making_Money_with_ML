@@ -38,7 +38,7 @@ p_load(tidyverse,rio,
 
 
 # Import data -------------------------------------------------------------
-load("../stores/data.Rdata")
+load("../stores/data2.Rdata")
 
 url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
 submission_template <- read.csv(url_submission_template)
@@ -73,21 +73,21 @@ Test_combine <- combine_chapinero[filtro, ]
 
 
 # Option 2: Submission template  ---------------------------------------------------
-bd <- left_join(submission_template, combine_chapinero, by = "property_id")
+base <- left_join(submission_template, db, by = "property_id")
 
 
 
 # Transforming data -------------------------------------------------------
 
 # Create ln_price
-bd$ln_price <- log(bd$price.x)
+base$ln_price <- log(base$price.x)
 
 # Train/Test
 set.seed(123)
-sample <- sample(c(TRUE, FALSE), nrow(bd), replace=TRUE, prob=c(0.7,0.3))
-sum(sample)/nrow(bd)
-train  <- bd[sample, ] 
-test   <- bd[!sample, ] 
+sample <- sample(c(TRUE, FALSE), nrow(base), replace=TRUE, prob=c(0.7,0.3))
+sum(sample)/nrow(base)
+train  <- base[sample, ] 
+test   <- base[!sample, ] 
 
 
 
@@ -112,14 +112,13 @@ stargazer(model1_lm,
 ## Lasso ####
 
 # Variables X
-names(bd)
-X0 <- as.matrix(bd  %>% select(-property_id,-price.y,-city,-month,-year,-surface_total,-property_type,
-                               -operation_type,-title,-description,-geometry,-MetrosCuadrados,-NumeroBanos,
-                               -price.x,-ln_price,-MetrosCuadrados_new))
+names(base)
+X0 <- as.matrix(base  %>% select(-property_id,-price.y,-geometry,
+                               -price.x,-ln_price))
 X0[is.na(X0)] <- 0
 
 # Variable Y
-Y <- bd$ln_price
+Y <- base$ln_price
   
 # Reg 1 Lasso
 lasso_no_pen <- glmnet(
@@ -131,6 +130,25 @@ lasso_no_pen <- glmnet(
 
 lasso_no_pen$beta
 summary(lm(Y~X0))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ## CART ####

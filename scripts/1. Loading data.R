@@ -375,21 +375,6 @@ combine_chapinero <- combine_chapinero %>%
   mutate(bathrooms = ifelse(is.na(bathrooms), NumeroBanos, bathrooms))
 
 
-### Variable número 11: Vecinos  ####
-# CORRER EN LA NOCHE
-library(sf)
-# Definir el radio de búsqueda en metros (5 kilómetros = 5000 metros)
-radio_busqueda <- 3000
-
-# Calcular el número de vecinos cercanos en el radio de búsqueda para cada observación
-combine_chapinero$num_vecinos <- sapply(1:nrow(combine_chapinero), function(i) {
-  punto <- combine_chapinero[i, "geometry"]
-  vecinos <- st_is_within_distance(combine_chapinero, punto, radio_busqueda)
-  sum(as.logical(vecinos)) - 1  # Restamos 1 para excluir la propia observación como vecino
-})
-
-
-
 ### Tabla de proporciones final ####
 nombres <- c("Parqueadero", "Elevador","Baño privado", "Balcón","Vista",
              "Remodelado","Admon incluida")
@@ -486,9 +471,13 @@ combine_chapinero$distancia_swimming_pool <- dist_min_swimming_pool
 combine_chapinero_sf$distancia_swimming_pool <- dist_min_swimming_pool
 
 
-# Save data ---------------------------------------------------------------
-save(combine_chapinero, file = "../stores/data.Rdata")
+db <- combine_chapinero  %>% select(-city,-month,-year,-surface_total,-property_type,
+                               -operation_type,-title,-description,-geometry,-MetrosCuadrados,-NumeroBanos,
+                               -MetrosCuadrados_new)
 
+
+# Save data ---------------------------------------------------------------
+save(db, file = "../stores/data.Rdata")
 
 
 # Cargue datos modificados ####
