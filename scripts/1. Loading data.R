@@ -183,6 +183,8 @@ rm(parqueaderoT_aux1,parqueaderoT_aux2,parqueaderoT_aux3,parqueaderoT_aux4,
    parqueaderoT_aux9,parqueaderoT_aux10)
 rm(parqueaderoT)
 
+
+
 ### Variable número 2: Elevador ####
 ascensorT_aux1<-str_detect( Descripc,"ascensor")
 ascensorT_aux2<-str_detect( Descripc,"acensor") 
@@ -209,6 +211,9 @@ rm(ascensorT_aux1,ascensorT_aux2,ascensorT_aux3,ascensorT_aux4,
    ascensorT_aux5,ascensorT_aux6,ascensorT_aux7,ascensorT_aux8)
 rm(ascensorT)
 
+
+
+
 ### Variable número 3: Baño privado ####
 bañoprivado_aux1 <-str_detect( Descripc,"bano privado")
 bañoprivado_aux2 <-str_detect( Descripc,"baño privado")
@@ -225,6 +230,9 @@ paste("El",prop_bano, "%", "de apartamentos tienen baño privado")
 # Limpiar ambiente
 rm(bañoprivado_aux1,bañoprivado_aux2)
 rm(bañoprivado)
+
+
+
 
 ### Variable número 4: Balcón/terraza ####
 balcon_aux1 <-str_detect( Descripc,"balcon")
@@ -253,6 +261,9 @@ rm(balcon_aux1,balcon_aux2,balcon_aux3,balcon_aux4,balcon_aux5,balcon_aux6,
    balcon_aux7,balcon_aux8,balcon_aux9)
 rm(balcon)
 
+
+
+
 ### Variable número 5: Vista ####
 vista_aux1 <-str_detect( Descripc,"vista")
 vista <-ifelse(vista_aux1==TRUE, 1,0 )
@@ -268,6 +279,9 @@ paste("El",prop_vista, "%", "de apartamentos tienen vista")
 # Limpiar ambiente
 rm(vista_aux1)
 rm(vista)
+
+
+
 
 ### Variable número 6: Remodelado ####
 remod_aux1 <-str_detect( Descripc,"remodelado")
@@ -298,6 +312,9 @@ rm(remod_aux1,remod_aux2,remod_aux3,remod_aux4,remod_aux5,remod_aux6,
    remod_aux7,remod_aux8,remod_aux9,remod_aux10,remod_aux11)
 rm(remodelado)
 
+
+
+
 ### Variable número 7: Admon incluida  ####
 admon_aux1 <-str_detect( Descripc,"administracion incluida")
 admon_aux2 <-str_detect( Descripc,"admon incluida")
@@ -321,10 +338,25 @@ rm(admon_aux1,admon_aux2,admon_aux3,admon_aux4,admon_aux5,admon_aux6)
 rm(admon)
 
 
+
 ### Variable número 8: Metros cuadrados  ####
 combine_chapinero <- combine_chapinero %>%
   mutate(MetrosCuadrados = as.numeric(str_extract(description, "\\d+(?=\\s*(?:metros cuadrados|m²|m2|mts2?|mt2|m\\^2|mtrs2?|mtrs))|(?<!\\d)0")))
 combine_chapinero$MetrosCuadrados[is.na(combine_chapinero$MetrosCuadrados)] = 0
+
+# Revision
+summary(combine_chapinero$MetrosCuadrados)
+sum(combine_chapinero$MetrosCuadrados == 0)
+
+# Ajuste opcional
+# Calcular el promedio de los valores no cero
+promedio <- mean(combine_chapinero$MetrosCuadrados[combine_chapinero$MetrosCuadrados != 0], na.rm = TRUE)
+
+# Crear una nueva variable con los valores reemplazados
+combine_chapinero$MetrosCuadrados_new <- ifelse(combine_chapinero$MetrosCuadrados == 0, promedio, combine_chapinero$MetrosCuadrados)
+
+
+
 
 ### Variable número 9: Casa/apartamento  ####
 combine_chapinero$Es_apartamento <- ifelse(combine_chapinero$property_type == "Apartamento", 1, 0)
@@ -335,6 +367,21 @@ combine_chapinero$NumeroBanos <- as.numeric(str_extract(combine_chapinero$descri
 # combinar variable baño
 combine_chapinero <- combine_chapinero %>%
   mutate(bathrooms = ifelse(is.na(bathrooms), NumeroBanos, bathrooms))
+
+
+### Variable número 11: Vecinos  ####
+# CORRER EN LA NOCHE
+library(sf)
+# Definir el radio de búsqueda en metros (5 kilómetros = 5000 metros)
+radio_busqueda <- 3000
+
+# Calcular el número de vecinos cercanos en el radio de búsqueda para cada observación
+combine_chapinero$num_vecinos <- sapply(1:nrow(combine_chapinero), function(i) {
+  punto <- combine_chapinero[i, "geometry"]
+  vecinos <- st_is_within_distance(combine_chapinero, punto, radio_busqueda)
+  sum(as.logical(vecinos)) - 1  # Restamos 1 para excluir la propia observación como vecino
+})
+
 
 
 ### Tabla de proporciones final ####
@@ -382,6 +429,8 @@ dist_min <- apply(dist_matrix, 1, min)
 combine_chapinero$distancia_parque <- dist_min
 combine_chapinero_sf$distancia_parque <- dist_min
 
+
+
 #### Variable número 2: Area del parque ####
 posicion <- apply(dist_matrix, 1, function(x) which.min(x))
 areas <- st_area(parques_geometria)
@@ -389,6 +438,9 @@ combine_chapinero$area_parque <- areas[posicion]
 combine_chapinero$area_parque <- as.numeric(combine_chapinero$area_parque)
 combine_chapinero_sf$area_parque <- areas[posicion]
 combine_chapinero_sf$area_parque <- as.numeric(combine_chapinero_sf$area_parque)
+
+
+
 
 #### Variable número 3: Sport centre ####
 sport_centre <- opq(bbox = getbb("Bogota Colombia")) %>%
@@ -406,6 +458,9 @@ dist_min_sport_centre <- apply(dist_matrix_sport_centre, 1, min)
 # Añadimos la columna de distancia al centro deportivo al dataframe combine_chapinero
 combine_chapinero$distancia_sport_centre <- dist_min_sport_centre
 combine_chapinero_sf$distancia_sport_centre <- dist_min_sport_centre
+
+
+
 
 #### Variable número 4: swimming_pool pool ####
 swimming_pool <- opq(bbox = getbb("Bogota Colombia")) %>%
@@ -425,35 +480,14 @@ combine_chapinero$distancia_swimming_pool <- dist_min_swimming_pool
 combine_chapinero_sf$distancia_swimming_pool <- dist_min_swimming_pool
 
 
-
+# Save data ---------------------------------------------------------------
 save(combine_chapinero, file = "../stores/data.Rdata")
 
 
 
+# Cargue datos modificados ####
+load("../stores/data.Rdata")
 
-# Grupos ------------------------------------------------------------------
-# Como se juntaron las bases train y tes, luego se filtraron los datos  que solo son de chapinero
-# y se añadieron nuevas variables; para entrenar los modelos es necesario tener divididos el grupo
-# de entrenamiento y de control nuevamente. Por lo cual debemos realizar nuevamente esta división:
-
-### Train Group
-filtro <- is.na(combine_chapinero$price)
-Train_combine <- combine_chapinero[!filtro, ]
-
-# Grafica
-ggplot(Train_combine, aes(x = price)) +
-  geom_histogram(fill = "darkblue") +
-  theme_bw() +
-  labs(x = "Precio de venta", y = "Cantidad")
-
-#Descriptivas - Variable de interes (precio)
-summary(Train_combine$price) %>%
-  as.matrix() %>%
-  as.data.frame() %>%
-  mutate(V1 = scales::dollar(V1))
-
-### Test Group
-Test_combine <- combine_chapinero[filtro, ]
 
 
 
