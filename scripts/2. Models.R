@@ -33,7 +33,8 @@ p_load(tidyverse,rio,
        rgeos,
        rio,
        rstudioapi,
-       stargazer)
+       stargazer,
+       glmnet)
 
 
 # Import data -------------------------------------------------------------
@@ -68,6 +69,9 @@ summary(Train_combine$price) %>%
 ### Test Group
 Test_combine <- combine_chapinero[filtro, ]
 
+
+
+
 # Option 2: Submission template  ---------------------------------------------------
 bd <- left_join(submission_template, combine_chapinero, by = "property_id")
 
@@ -88,15 +92,10 @@ test   <- bd[!sample, ]
 
 
 # Models ------------------------------------------------------------------
-# Matrix of predictos 
-names(bd)
-X0 <- as.matrix(bd  %>% select(-property_id,-price.y,-city,-month,-year))
 
-#Vector that needs predicting
-y <- nlsy$lnw_2016
 
 ## LM ####
-
+## CONTINUAR CON MODELOS SIMPLES
 model1_lm<-lm(ln_price~1,data=train)
 summary(model1_lm)
 
@@ -111,6 +110,22 @@ stargazer(model1_lm,
 
 
 ## Lasso ####
+# PONER NAS EN 0 PARA QUE SIRVA
+# Matrix of predictos 
+names(bd)
+X0 <- as.matrix(bd  %>% select(-property_id,-price.y,-city,-month,-year,-surface_total,-property_type,
+                               -operation_type,-title,-description,-geometry,-MetrosCuadrados,-NumeroBanos,
+                               -price.x,-ln_price,-MetrosCuadrados_new))
+
+Y <- bd$ln_price
+  
+  
+lasso_no_pen <- glmnet(
+  x = X0,
+  y = Y,
+  alpha = 1, #lasso
+  lambda=0
+)
 
 
 
