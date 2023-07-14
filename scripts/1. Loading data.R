@@ -16,6 +16,11 @@
 
 rm(list = ls())
 
+path_sript <- rstudioapi::getActiveDocumentContext()$path
+path_folder <- dirname(path_sript)
+setwd(path_folder)
+
+
 ## llamado librerías de la sesión
 require(pacman)
 
@@ -26,7 +31,9 @@ p_load(tidyverse,rio,
        osmdata,
        nngeo,
        magrittr,
-       rgeos)
+       rgeos,
+       rio,
+       rstudioapi)
 
 
 # Import data -------------------------------------------------------------
@@ -405,7 +412,7 @@ amusement_arcade <- opq(bbox = getbb("Bogota Colombia")) %>%
   add_osm_feature(key = "amenity" , value = "amusement_arcade") 
 amusement_arcade_sf <- osmdata_sf(amusement_arcade)
 amusement_arcade_geometria <- amusement_arcade_sf$osm_points %>% 
-  select(osm_id, name)
+  select(osm_id, amenity)
 
 # Calculamos la matriz de distancias entre los apartamentos y los arcades de entretenimiento
 dist_matrix_amusement_arcade <- st_distance(x = combine_chapinero_sf, y = amusement_arcade_geometria)
@@ -416,6 +423,9 @@ dist_min_amusement_arcade <- apply(dist_matrix_amusement_arcade, 1, min)
 # Añadimos la columna de distancia al arcade de entretenimiento al dataframe combine_chapinero
 combine_chapinero$distancia_amusement_arcade <- dist_min_amusement_arcade
 combine_chapinero_sf$distancia_amusement_arcade <- dist_min_amusement_arcade
+
+## Guardar base
+save(combine_chapinero, file = "../stores/data.Rdata")
 
 
 
