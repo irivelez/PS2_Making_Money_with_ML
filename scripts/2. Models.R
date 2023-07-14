@@ -110,16 +110,18 @@ stargazer(model1_lm,
 
 
 ## Lasso ####
-# PONER NAS EN 0 PARA QUE SIRVA
-# Matrix of predictos 
+
+# Variables X
 names(bd)
 X0 <- as.matrix(bd  %>% select(-property_id,-price.y,-city,-month,-year,-surface_total,-property_type,
                                -operation_type,-title,-description,-geometry,-MetrosCuadrados,-NumeroBanos,
                                -price.x,-ln_price,-MetrosCuadrados_new))
+X0[is.na(X0)] <- 0
 
+# Variable Y
 Y <- bd$ln_price
   
-  
+# Reg 1 Lasso
 lasso_no_pen <- glmnet(
   x = X0,
   y = Y,
@@ -127,6 +129,8 @@ lasso_no_pen <- glmnet(
   lambda=0
 )
 
+lasso_no_pen$beta
+summary(lm(Y~X0))
 
 
 ## CART ####
