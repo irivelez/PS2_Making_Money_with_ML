@@ -32,7 +32,8 @@ p_load(tidyverse,rio,
        magrittr,
        rgeos,
        rio,
-       rstudioapi)
+       rstudioapi,
+       stargazer)
 
 
 # Import data -------------------------------------------------------------
@@ -71,7 +72,55 @@ Test_combine <- combine_chapinero[filtro, ]
 bd <- left_join(submission_template, combine_chapinero, by = "property_id")
 
 
+
+# Transforming data -------------------------------------------------------
+
+# Create ln_price
+bd$ln_price <- log(bd$price.x)
+
+# Train/Test
+set.seed(123)
+sample <- sample(c(TRUE, FALSE), nrow(bd), replace=TRUE, prob=c(0.7,0.3))
+sum(sample)/nrow(bd)
+train  <- bd[sample, ] 
+test   <- bd[!sample, ] 
+
+
+
 # Models ------------------------------------------------------------------
+# Matrix of predictos 
+names(bd)
+X0 <- as.matrix(bd  %>% select(-property_id,-price.y,-city,-month,-year))
+
+#Vector that needs predicting
+y <- nlsy$lnw_2016
+
+## LM ####
+
+model1_lm<-lm(ln_price~1,data=train)
+summary(model1_lm)
+
+stargazer(model1_lm,
+          type = "text", 
+          dep.var.labels = "Precio del casa",
+          digits = 0
+)
+
+
+## Ridge ####
+
+
+## Lasso ####
+
+
+
+## CART ####
+
+
+
+## Bosque ####
+
+
 
 
 

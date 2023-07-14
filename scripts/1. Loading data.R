@@ -348,18 +348,19 @@ rm(admon)
 combine_chapinero <- combine_chapinero %>%
   mutate(MetrosCuadrados = as.numeric(str_extract(description, "\\d+(?=\\s*(?:metros cuadrados|m²|m2|mts2?|mt2|m\\^2|mtrs2?|mtrs))|(?<!\\d)0")))
 combine_chapinero$MetrosCuadrados[is.na(combine_chapinero$MetrosCuadrados)] = 0
+combine_chapinero <- combine_chapinero %>%
+  mutate(surface_covered = ifelse(is.na(surface_covered), MetrosCuadrados, surface_covered))
 
 # Revision
-summary(combine_chapinero$MetrosCuadrados)
-sum(combine_chapinero$MetrosCuadrados == 0)
+summary(combine_chapinero$surface_covered)
+sum(combine_chapinero$surface_covered == 0)
 
 # Ajuste opcional
 # Calcular el promedio de los valores no cero
-promedio <- mean(combine_chapinero$MetrosCuadrados[combine_chapinero$MetrosCuadrados != 0], na.rm = TRUE)
+promedio <- mean(combine_chapinero$surface_covered[combine_chapinero$surface_covered != 0], na.rm = TRUE)
 
 # Crear una nueva variable con los valores reemplazados
-combine_chapinero$MetrosCuadrados_new <- ifelse(combine_chapinero$MetrosCuadrados == 0, promedio, combine_chapinero$MetrosCuadrados)
-
+combine_chapinero$surface_covered_new <- ifelse(combine_chapinero$surface_covered == 0, promedio, combine_chapinero$surface_covered)
 
 
 
