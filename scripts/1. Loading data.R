@@ -407,28 +407,26 @@ dist_min_sport_centre <- apply(dist_matrix_sport_centre, 1, min)
 combine_chapinero$distancia_sport_centre <- dist_min_sport_centre
 combine_chapinero_sf$distancia_sport_centre <- dist_min_sport_centre
 
-#### Variable número 4: amusement_arcade ####
-amusement_arcade <- opq(bbox = getbb("Bogota Colombia")) %>%
-  add_osm_feature(key = "amenity" , value = "amusement_arcade") 
-amusement_arcade_sf <- osmdata_sf(amusement_arcade)
-amusement_arcade_geometria <- amusement_arcade_sf$osm_points %>% 
-  select(osm_id, amenity)
+#### Variable número 4: swimming_pool pool ####
+swimming_pool <- opq(bbox = getbb("Bogota Colombia")) %>%
+  add_osm_feature(key = "leisure" , value = "swimming_pool") 
+swimming_pool_sf <- osmdata_sf(swimming_pool)
+swimming_pool_geometria <- swimming_pool_sf$osm_polygons %>% 
+  select(osm_id, name)
 
-# Calculamos la matriz de distancias entre los apartamentos y los arcades de entretenimiento
-dist_matrix_amusement_arcade <- st_distance(x = combine_chapinero_sf, y = amusement_arcade_geometria)
+# Calculamos la matriz de distancias entre los apartamentos y las piscinas
+dist_matrix_swimming_pool <- st_distance(x = combine_chapinero_sf, y = swimming_pool_geometria)
 
-# Encontramos la distancia mínima a un arcade de entretenimiento
-dist_min_amusement_arcade <- apply(dist_matrix_amusement_arcade, 1, min)
+# Encontramos la distancia mínima a una piscina
+dist_min_swimming_pool <- apply(dist_matrix_swimming_pool, 1, min)
 
-# Añadimos la columna de distancia al arcade de entretenimiento al dataframe combine_chapinero
-combine_chapinero$distancia_amusement_arcade <- dist_min_amusement_arcade
-combine_chapinero_sf$distancia_amusement_arcade <- dist_min_amusement_arcade
+# Añadimos la columna de distancia a la piscina al dataframe combine_chapinero
+combine_chapinero$distancia_swimming_pool <- dist_min_swimming_pool
+combine_chapinero_sf$distancia_swimming_pool <- dist_min_swimming_pool
 
-## Guardar base
+
+
 save(combine_chapinero, file = "../stores/data.Rdata")
-
-
-
 
 
 
