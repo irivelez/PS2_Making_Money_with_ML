@@ -88,6 +88,8 @@ test$description <- gsub("\\s+", " ", str_trim(test$description))
 combine <- bind_rows(train,test) %>% st_as_sf(coords=c("lon","lat"),crs=4326)
 class(combine)
 
+sum(is.na(combine$price))
+sum(!is.na(combine$price))
 
 # View data 1 ---------------------------------------------------------------
 
@@ -144,6 +146,9 @@ combine_chapinero <- st_crop(combine, chapinero)
 leaflet() %>% addTiles() %>% addCircles(data=combine_chapinero) %>% addPolygons(data = chapinero, col = "red")
 available_features()
 available_tags("amenity")
+
+sum(is.na(combine_chapinero$price))
+sum(!is.na(combine_chapinero$price))
 
 # Description data --------------------------------------------------------
 
