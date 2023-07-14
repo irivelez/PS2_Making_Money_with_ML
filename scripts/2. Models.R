@@ -63,17 +63,6 @@ train  <- base[sample, ]
 test   <- base[!sample, ] 
 
 # Models ------------------------------------------------------------------
-## Groups
-# Variables X
-names(base)
-X0 <- as.matrix(base  %>% select(-property_id,-geometry,
-                                 -price.x,-ln_price))
-X0[is.na(X0)] <- 0
-
-# Variable Y
-Y <- as.matrix(base$ln_price)
-
-
 ## LM ####
 ### Modelo 1 lm ####
 model1_lm<-lm(ln_price~1, data = train)
@@ -124,9 +113,94 @@ mse_lm_db<-data.frame(model=factor(c("model1","model2","model3"),ordered=TRUE),
                MSE=mse_lm)
 mse_lm_db
 
+# FOLDS LM ####
+require("caret")
+set.seed(0101)
+ctrl <- trainControl(
+  method = "cv",  # crossvalidation
+  number = 5) # número de folds
+
+modelo1_caret_lm <- train(ln_price~surface_covered_new, 
+                      data = base, 
+                      method = 'lm',
+                      trControl= ctrl )
+
+modelo1_caret_lm
+
+# Modelo 1 loocv
+ctrl_loocv <- trainControl(
+  method = "loocv")
+
+modelo1_caret_loocv_lm <- train(ln_price~surface_covered_new, 
+                            data = base, 
+                            method = 'lm',
+                            trControl= ctrl_loocv )
+modelo1_caret_loocv_lm
+
+# Modelo 2 loocv
+modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+                                  parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+                                  Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+                                  distancia_swimming_pool, 
+                                data = base, 
+                                method = 'lm',
+                                trControl= ctrl_loocv )
+modelo2_caret_loocv_lm
+
+
 
 ## Ridge ####
+## Groups
+# Variables X
+names(base)
+X0 <- as.matrix(base  %>% select(-property_id,-geometry,
+                                 -price.x,-ln_price,-surface_covered))
 
+# Variable Y
+Y <- as.matrix(base$ln_price)
+
+## Models
+# Model 1
+ridge0 <- glmnet(
+  x = X0,
+  y = Y,
+  alpha = 0 #ridge
+)
+
+# Grafica 1 ridge
+plot(ridge0, xvar = "lambda")
+
+# Model with CARET
+p_load("caret")
+set.seed(123)
+fitControl <- trainControl(## 5-fold CV, 10 better
+  method = "cv",
+  number = 5)
+
+ridge1<-train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+               parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+               Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+               distancia_swimming_pool,
+             data=base,
+             method = 'glmnet', 
+             trControl = fitControl,
+             tuneGrid = expand.grid(alpha = 0, #Ridge
+                                    lambda = seq(0,20,0.01))
+) 
+
+plot(ridge1$results$lambda,
+     ridge1$results$RMSE,
+     xlab="lambda",
+     ylab="Root Mean-Squared Error (RMSE)"
+     )
+
+ridge1$bestTune
+
+coef_ridge <- coef(ridge1$finalModel, ridge1$bestTune$lambda)
+coef_ridge
+
+ridge1$results$RMSE[which.min(ridge1$results$lambda)]
+ridge1$results$MAE[which.min(ridge1$results$lambda)]
 
 ## Lasso ####
 
