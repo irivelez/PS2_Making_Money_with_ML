@@ -21,6 +21,7 @@ setwd(path_folder)
 
 
 ## llamado librerías de la sesión
+if(!require(pacman)) install.packages("pacman")
 require(pacman)
 
 p_load(tidyverse,rio,
@@ -54,7 +55,6 @@ merged_data$price <- ifelse(is.na(merged_data$price.x), merged_data$price.y, mer
 merged_data <- merged_data[, !(names(merged_data) %in% c("price.x", "price.y"))]
 
 # Depurar
-rm(db_merge)
 rm(submission_template)
 summary(merged_data$price)
 merged_data[is.na(merged_data)] <- 0
@@ -65,20 +65,25 @@ merged_data$ln_price <- log(merged_data$price)
 
 # Train/test
 p_load(caret)
-train.index <- createDataPartition(merged_data$ln_price, p=0.2)$Resample1
+train.index <- createDataPartition(merged_data$ln_price, p=0.6)$Resample1
 train_df <- merged_data[train.index,]
 test_df <- merged_data[-train.index,]
 
-# Observar si los grupos quedaron balanceados
+# Observar si los grupos quedaron balanceados y visualizar la distribución de los datos
 summary(train_df$ln_price)
 summary(test_df$ln_price)
 
-
-# View data ---------------------------------------------------------------
 ggplot(train_df, aes(x = ln_price)) +
   geom_histogram(fill = "darkblue") +
   theme_bw() +
   labs(x = "Precio de venta", y = "Cantidad")
+
+ggplot(test_df, aes(x = ln_price)) +
+  geom_histogram(fill = "darkblue") +
+  theme_bw() +
+  labs(x = "Precio de venta", y = "Cantidad")
+
+
 
 # Descriptivas - Variable de interes (precio)
 summary(train_df$ln_price) %>%
@@ -87,15 +92,10 @@ summary(train_df$ln_price) %>%
   mutate(V1 = scales::dollar(V1))
 
 
-
-
-
-
-
-
-
-
-
+summary(test_df$ln_price) %>%
+  as.matrix() %>%
+  as.data.frame() %>%
+  mutate(V1 = scales::dollar(V1))
 
 # Models ------------------------------------------------------------------
 
@@ -109,20 +109,18 @@ merged_data_sf <- st_as_sf(
   crs = 4326
 )
 
-p_load(spatialsample,sf)
 
 # Spatial Blocks
+p_load(spatialsample,sf)
+
+install.packages("caret")
 require("caret")
+
 set.seed(1357)
-block_folds <- spatial_block_cv(merged_data_sf, v = 5)
+block_folds <- spatial_block_cv(merged_data, v = 5)
 
 autoplot(block_folds)
 
-
-#___________________________
-### Folds
-set.seed(0101)
-cv3 <- trainControl(method = "cv", number = 5)
 #__________________________
 
 ## LM Model ####
