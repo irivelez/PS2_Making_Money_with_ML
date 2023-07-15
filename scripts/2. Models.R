@@ -65,7 +65,7 @@ merged_data$ln_price <- log(merged_data$price)
 
 # Train/test
 p_load(caret)
-train.index <- createDataPartition(merged_data$ln_price, p=0.6)$Resample1
+train.index <- createDataPartition(merged_data$ln_price, p=0.2)$Resample1
 train_df <- merged_data[train.index,]
 test_df <- merged_data[-train.index,]
 
@@ -117,14 +117,17 @@ install.packages("caret")
 require("caret")
 
 set.seed(1357)
-block_folds <- spatial_block_cv(merged_data, v = 5)
+block_folds <- spatial_block_cv(method ="cv", v = 5)
 
+block_folds <- spatial_block_cv(merged_data_sf, v = 5)
 autoplot(block_folds)
+
 
 #__________________________
 
 ## LM Model ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+block_folds <- trainControl(method = "CV", number = 5)
 modelo1_caret_lm <- train(ln_price~surface_covered_new, 
                           data = train_df, 
                           method = 'lm',
@@ -136,6 +139,7 @@ modelo1_caret_lm
 y_hat_insample_lm <- predict(modelo1_caret_lm,train_df)
 y_hat_outsample_lm <- predict(modelo1_caret_lm,test_df)
 
+p_load(MLmetrics)
 # Insample
 MAE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
@@ -143,8 +147,6 @@ MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 # Outsample
 MAE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
-
-
 
 
 
@@ -177,9 +179,9 @@ modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bath
                                   parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
                                   Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
                                   distancia_swimming_pool, 
-                                data = train, 
+                                data = train_df, 
                                 method = 'lm',
-                                trControl= ctrl_loocv )
+                                trControl= ctrl_loocv)
 modelo2_caret_loocv_lm
 
 ## Evaluar modelo loocv 
@@ -206,11 +208,17 @@ modelo1 <- train(
     Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
     distancia_swimming_pool,
   data = train_df,
-  method="rpart",
-  trControl=cv3,
-  metric="RMSE",
-  maximize=F
+  method ="rpart",
+  trControl = ctrl_loocv,
+  metric ="RMSE",
+  maximize = F
 )
+
+results <- data.frame(model = factor (c("modelo1_caret_lm", 
+                                        "modelo1_caret_loocv_lm",
+                                        "modelo2_caret_loocv_lm"), 
+                                      ordered = TRUE))
+results
 
 p_load(rattle)
 modelo1$finalModel
