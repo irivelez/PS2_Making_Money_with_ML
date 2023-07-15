@@ -112,6 +112,12 @@ merged_data_sf <- st_as_sf(
 p_load(spatialsample,sf)
 buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=5,buffer=0.5)
 
+# Spatial Blocks
+set.seed(123)
+block_folds <- spatial_block_cv(merged_data_sf, v = 5)
+
+autoplot(block_folds)
+
 # Función para realizar la validación cruzada en cada parte
 perform_spatial_cv <- function(data, radius, buffer) {
   spatial_buffer_vfold_cv(data, radius = radius, buffer = buffer)
