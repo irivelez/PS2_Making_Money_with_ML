@@ -114,7 +114,7 @@ buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=40,buffer=5)
 autoplot(buffer_folds)
 
 # Nota: Revisar si se pueden completar estos modelos de autocorrelación espacial ya que
-# no tenemos Neighborhood 
+# no tenemos como agruparlos (Neighborhood en el ejemplo) 
 
 
 #___________________________
