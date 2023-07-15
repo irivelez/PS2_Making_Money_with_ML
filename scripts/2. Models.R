@@ -110,43 +110,18 @@ merged_data_sf <- st_as_sf(
 )
 
 p_load(spatialsample,sf)
-buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=5,buffer=0.5)
 
 # Spatial Blocks
-set.seed(123)
+require("caret")
+set.seed(1357)
 block_folds <- spatial_block_cv(merged_data_sf, v = 5)
 
 autoplot(block_folds)
 
 
-# Función para realizar la validación cruzada en cada parte
-perform_spatial_cv <- function(data, radius, buffer) {
-  spatial_buffer_vfold_cv(data, radius = radius, buffer = buffer)
-}
-
-# Tamaño de cada parte 
-part_size <- 1000
-
-# División del conjunto de datos en partes más pequeñas
-data_parts <- split(merged_data_sf, rep(1:(nrow(merged_data_sf) %/% part_size), each = part_size, length.out = nrow(merged_data_sf)))
-
-# ACA EMPIEZA:Realizar la validación cruzada en cada parte
-buffer_folds_list <- lapply(data_parts, function(part_data) {
-  perform_spatial_cv(part_data, radius = 5, buffer = 0.5)
-})
-
-# Combinar los resultados de la validación cruzada
-buffer_folds <- do.call("rbind", buffer_folds_list)
-# Grafica
-autoplot(buffer_folds)
-
-# Nota: Revisar si se pueden completar estos modelos de autocorrelación espacial ya que
-# no tenemos como agruparlos (Neighborhood en el ejemplo) 
-
-
 #___________________________
 ### Folds
-require("caret")
+
 set.seed(0101)
 cv3 <- trainControl(method = "cv", number = 5)
 #__________________________
@@ -156,7 +131,7 @@ cv3 <- trainControl(method = "cv", number = 5)
 modelo1_caret_lm <- train(ln_price~surface_covered_new, 
                           data = train_df, 
                           method = 'lm',
-                          trControl= cv3 )
+                          trControl= block_folds )
 
 modelo1_caret_lm
 
