@@ -21,6 +21,7 @@ setwd(path_folder)
 
 
 ## llamado librerías de la sesión
+if(!require(pacman)) install.packages("pacman")
 require(pacman)
 
 p_load(tidyverse,rio,
@@ -35,6 +36,8 @@ p_load(tidyverse,rio,
        rstudioapi,
        stargazer,
        glmnet)
+
+pacman::p_load(sf, spatialRF, purrr)
 
 
 # Import data -------------------------------------------------------------
@@ -52,7 +55,6 @@ merged_data$price <- ifelse(is.na(merged_data$price.x), merged_data$price.y, mer
 merged_data <- merged_data[, !(names(merged_data) %in% c("price.x", "price.y"))]
 
 # Depurar
-rm(db_merge)
 rm(submission_template)
 summary(merged_data$price)
 merged_data[is.na(merged_data)] <- 0
@@ -67,16 +69,21 @@ train.index <- createDataPartition(merged_data$ln_price, p=0.2)$Resample1
 train_df <- merged_data[train.index,]
 test_df <- merged_data[-train.index,]
 
-# Observar si los grupos quedaron balanceados
+# Observar si los grupos quedaron balanceados y visualizar la distribución de los datos
 summary(train_df$ln_price)
 summary(test_df$ln_price)
 
-
-# View data ---------------------------------------------------------------
 ggplot(train_df, aes(x = ln_price)) +
   geom_histogram(fill = "darkblue") +
   theme_bw() +
   labs(x = "Precio de venta", y = "Cantidad")
+
+ggplot(test_df, aes(x = ln_price)) +
+  geom_histogram(fill = "darkblue") +
+  theme_bw() +
+  labs(x = "Precio de venta", y = "Cantidad")
+
+
 
 # Descriptivas - Variable de interes (precio)
 summary(train_df$ln_price) %>%
@@ -85,15 +92,10 @@ summary(train_df$ln_price) %>%
   mutate(V1 = scales::dollar(V1))
 
 
-
-
-
-
-
-
-
-
-
+summary(test_df$ln_price) %>%
+  as.matrix() %>%
+  as.data.frame() %>%
+  mutate(V1 = scales::dollar(V1))
 
 # Models ------------------------------------------------------------------
 
@@ -107,29 +109,29 @@ merged_data_sf <- st_as_sf(
   crs = 4326
 )
 
+
+# Spatial Blocks
 p_load(spatialsample,sf)
-buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=40,buffer=5)
 
-# Grafica
-autoplot(buffer_folds)
-
-# Nota: Revisar si se pueden completar estos modelos de autocorrelación espacial ya que
-# no tenemos como agruparlos (Neighborhood en el ejemplo) 
-
-
-#___________________________
-### Folds
+install.packages("caret")
 require("caret")
-set.seed(0101)
-cv3 <- trainControl(method = "cv", number = 5)
+
+set.seed(1357)
+block_folds <- spatial_block_cv(method ="cv", v = 5)
+
+block_folds <- spatial_block_cv(merged_data_sf, v = 5)
+autoplot(block_folds)
+
+
 #__________________________
 
 ## LM Model ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+block_folds <- trainControl(method = "CV", number = 5)
 modelo1_caret_lm <- train(ln_price~surface_covered_new, 
                           data = train_df, 
                           method = 'lm',
-                          trControl= cv3 )
+                          trControl= block_folds )
 
 modelo1_caret_lm
 
@@ -137,6 +139,7 @@ modelo1_caret_lm
 y_hat_insample_lm <- predict(modelo1_caret_lm,train_df)
 y_hat_outsample_lm <- predict(modelo1_caret_lm,test_df)
 
+p_load(MLmetrics)
 # Insample
 MAE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
@@ -144,8 +147,6 @@ MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 # Outsample
 MAE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
-
-
 
 
 
@@ -172,22 +173,16 @@ MAPE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
 MAE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
 
-
-
-
-
-
 ## Loocv Model 2 ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
 modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
                                   parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
                                   Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
                                   distancia_swimming_pool, 
-                                data = train, 
+                                data = train_df, 
                                 method = 'lm',
-                                trControl= ctrl_loocv )
+                                trControl= ctrl_loocv)
 modelo2_caret_loocv_lm
-
 
 ## Evaluar modelo loocv 
 y_hat_insample_loocv2 <- predict(modelo2_caret_loocv_lm,train_df)
@@ -213,11 +208,17 @@ modelo1 <- train(
     Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
     distancia_swimming_pool,
   data = train_df,
-  method="rpart",
-  trControl=cv3,
-  metric="RMSE",
-  maximize=F
+  method ="rpart",
+  trControl = ctrl_loocv,
+  metric ="RMSE",
+  maximize = F
 )
+
+results <- data.frame(model = factor (c("modelo1_caret_lm", 
+                                        "modelo1_caret_loocv_lm",
+                                        "modelo2_caret_loocv_lm"), 
+                                      ordered = TRUE))
+results
 
 p_load(rattle)
 modelo1$finalModel
@@ -239,10 +240,6 @@ MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 
 # Notas: Este es un modelo simple en el que no se modifican los grid
-
-
-
-
 
 ## Ranger Model ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
