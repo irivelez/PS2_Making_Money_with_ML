@@ -86,11 +86,126 @@ summary(train_df$ln_price) %>%
 
 
 
-# Models ------------------------------------------------------------------
-# RPart Model ####
-# Para correr este modelo se tuvo una proporción 0.8 en los datos de train
 
+
+
+
+
+
+
+
+
+# Models ------------------------------------------------------------------
+
+## Spatial Dependence ------------------------------------------------------
+merged_data_sf <- st_as_sf(
+  merged_data,
+  # "coords" is in x/y order -- so longitude goes first!
+  coords = c("Longitude", "Latitude"),
+  # Set our coordinate reference system to EPSG:4326,
+  # the standard WGS84 geodetic coordinate reference system
+  crs = 4326
+)
+
+p_load(spatialsample,sf)
+buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=40,buffer=5)
+
+# Grafica
+autoplot(buffer_folds)
+
+# Nota: Revisar si se pueden completar estos modelos de autocorrelación espacial ya que
+# no tenemos Neighborhood 
+
+
+#___________________________
+### Folds
+require("caret")
+set.seed(0101)
 cv3 <- trainControl(method = "cv", number = 5)
+#__________________________
+
+## LM Model ####
+# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+modelo1_caret_lm <- train(ln_price~surface_covered_new, 
+                          data = train_df, 
+                          method = 'lm',
+                          trControl= cv3 )
+
+modelo1_caret_lm
+
+## Evaluar modelo LM
+y_hat_insample_lm <- predict(modelo1_caret_lm,train_df)
+y_hat_outsample_lm <- predict(modelo1_caret_lm,test_df)
+
+# Insample
+MAE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
+
+
+
+
+
+## Loocv Model 1 ####
+# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+ctrl_loocv <- trainControl(
+  method = "loocv")
+
+modelo1_caret_loocv_lm <- train(ln_price~surface_covered_new, 
+                                data = train_df, 
+                                method = 'lm',
+                                trControl= ctrl_loocv )
+modelo1_caret_loocv_lm
+
+## Evaluar modelo loocv 
+y_hat_insample_loocv <- predict(modelo1_caret_loocv_lm,train_df)
+y_hat_outsample_loocv <- predict(modelo1_caret_loocv_lm,test_df)
+
+# Insample
+MAE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
+
+
+
+
+
+
+## Loocv Model 2 ####
+# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+                                  parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+                                  Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+                                  distancia_swimming_pool, 
+                                data = train, 
+                                method = 'lm',
+                                trControl= ctrl_loocv )
+modelo2_caret_loocv_lm
+
+
+## Evaluar modelo loocv 
+y_hat_insample_loocv2 <- predict(modelo2_caret_loocv_lm,train_df)
+y_hat_outsample_loocv2 <- predict(modelo2_caret_loocv_lm,test_df)
+
+# Insample
+MAE(y_pred = y_hat_insample_loocv2, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample_loocv2, y_true = train_df$ln_price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_loocv2, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_outsample_loocv2, y_true = train_df$ln_price)
+
+
+
+
+## RPart Model ####
+# Para correr este modelo se tuvo una proporción 0.8 en los datos de train
 
 modelo1 <- train(
   ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
@@ -108,7 +223,7 @@ p_load(rattle)
 modelo1$finalModel
 fancyRpartPlot(modelo1$finalModel)
 
-## Evaluar modelo RPart ####
+## Evaluar modelo RPart
 
 y_hat_insample1 <- predict(modelo1,train_df)
 y_hat_outsample1 <- predict(modelo1,test_df)
@@ -123,8 +238,13 @@ MAPE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
 MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 
+# Notas: Este es un modelo simple en el que no se modifican los grid
 
-# Ranger Model ####
+
+
+
+
+## Ranger Model ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
 
 # Grid
@@ -151,7 +271,7 @@ modelo2 <- train(
 
 plot(modelo2)
 
-## Evaluar modelo Ranger ####
+## Evaluar modelo Ranger 
 
 y_hat_insample2 <- predict(modelo2,train_df)
 y_hat_outsample2 <- predict(modelo2,test_df)
@@ -171,217 +291,54 @@ MAPE(y_pred = y_hat_outsample2, y_true = train_df$ln_price)
 
 
 
+## Boosting Model ####
+install.packages("h2o")
+library(h2o)
+h2o.init(nthreads = 4)
 
-
-
-
-
-
-
-
-
-
-## LM ####
-### Modelo 1 lm ####
-model1_lm<-lm(ln_price~1, data = train)
-summary(model1_lm)
-coef(model1_lm)
-
-#prediction on new data
-test$yhat_model1_lm<-predict(model1_lm,newdata = test)
-MSE_model1_lm <- with(test,mean((ln_price-yhat_model1_lm)^2))
-MSE_model1_lm
-
-### Modelo 2 lm ####
-model2_lm<-lm(ln_price~surface_covered_new, data = train)
-summary(model2_lm)
-coef(model2_lm)
-
-#prediction on new data
-test$yhat_model2_lm<-predict(model2_lm,newdata = test)
-MSE_model2_lm <- with(test,mean((ln_price-yhat_model2_lm)^2))
-MSE_model2_lm
-
-### Modelo 3 lm ####
-model3_lm<-lm(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-                parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-                Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
-                distancia_swimming_pool, data = train)
-summary(model3_lm)
-coef(model3_lm)
-
-#prediction on new data
-test$yhat_model3_lm<-predict(model3_lm,newdata = test)
-MSE_model3_lm <- with(test,mean((ln_price-yhat_model3_lm)^2))
-MSE_model3_lm
-
-
-
-# Create vars with all the MSE
-mse1_lm<-with(test,round(mean((ln_price-yhat_model1_lm)^2),20))
-mse2_lm<-with(test,round(mean((ln_price-yhat_model2_lm)^2),20))
-mse3_lm<-with(test,round(mean((ln_price-yhat_model3_lm)^2),20))
-
-
-#put them in a vector
-mse_lm<-c(mse1_lm,mse2_lm,mse3_lm)
-
-#create a data frame
-mse_lm_db<-data.frame(model=factor(c("model1","model2","model3"),ordered=TRUE),
-               MSE=mse_lm)
-mse_lm_db
-
-# FOLDS LM ####
-require("caret")
-set.seed(0101)
-ctrl <- trainControl(
-  method = "cv",  # crossvalidation
-  number = 5) # número de folds
-
-modelo1_caret_lm <- train(ln_price~surface_covered_new, 
-                      data = train, 
-                      method = 'lm',
-                      trControl= ctrl )
-
-modelo1_caret_lm
-
-# Modelo 1 loocv
-ctrl_loocv <- trainControl(
-  method = "loocv")
-
-modelo1_caret_loocv_lm <- train(ln_price~surface_covered_new, 
-                            data = train, 
-                            method = 'lm',
-                            trControl= ctrl_loocv )
-modelo1_caret_loocv_lm
-
-# Modelo 2 loocv
-modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-                                  parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-                                  Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
-                                  distancia_swimming_pool, 
-                                data = train, 
-                                method = 'lm',
-                                trControl= ctrl_loocv )
-modelo2_caret_loocv_lm
-
-
-
-## Ridge ####
-## Groups
-# Variables X
-names(train)
-X0 <- as.matrix(train  %>% select(-property_id,-price,-surface_covered,-geometry,
-                                  -ln_price))
-
-# Variable Y
-Y <- train$ln_price
-
-## Models
-# Model 1
-ridge0 <- glmnet(
-  x = X0,
-  y = Y,
-  alpha = 0 #ridge
+tunegrid_gbm <- expand.grid(
+  learn_rate=c(0.1, 0.01, 0.001),
+  ntrees= c(50,100,500),
+  max_depth=10,
+  min_rows=70,
+  col_sample_rate=0.2
 )
 
-
-library(glmnet)
-
-# Variables X
-X0 <- as.matrix(train %>% 
-                  dplyr::select(-property_id, -price, -surface_covered, -geometry, -ln_price))
-
-# Variable Y
-Y <- as.matrix(train$ln_price)
-class(Y)
-
-## Models
-# Model 1
-ridge0 <- glmnet(x = X0, y = Y, alpha = 0)
-
-
-
-
-# Variables X
-names(train)
-X0 <- sparse.model.matrix(~ . - property_id - price - surface_covered - geometry - ln_price, data = train)
-
-# Variable Y
-Y <- train$ln_price
-
-## Models
-# Model 1
-ridge0 <- glmnet(x = X0, y = Y, alpha = 0)
-
-
-# Grafica 1 ridge
-plot(ridge0, xvar = "lambda")
-
-# Model with CARET
-p_load("caret")
-set.seed(123)
-fitControl <- trainControl(## 5-fold CV, 10 better
-  method = "cv",
-  number = 5)
-
-ridge1<-train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-               parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-               Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
-               distancia_swimming_pool,
-             data=train,
-             method = 'glmnet', 
-             trControl = fitControl,
-             tuneGrid = expand.grid(alpha = 0, #Ridge
-                                    lambda = seq(0,20,0.01))
-) 
-
-plot(ridge1$results$lambda,
-     ridge1$results$RMSE,
-     xlab="lambda",
-     ylab="Root Mean-Squared Error (RMSE)"
-     )
-
-ridge1$bestTune
-
-coef_ridge <- coef(ridge1$finalModel, ridge1$bestTune$lambda)
-coef_ridge
-
-ridge1$results$RMSE[which.min(ridge1$results$lambda)]
-ridge1$results$MAE[which.min(ridge1$results$lambda)]
-
-## Lasso ####
-lasso<-train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-               parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-               Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
-               distancia_swimming_pool,
-             data=train,
-             method = 'glmnet', 
-             trControl = fitControl,
-             tuneGrid = expand.grid(alpha = 1, #lasso
-                                    lambda = ridge0$lambda)
-) 
-
-
-## Compare Ridge-Lasso
-RMSE_df <- cbind()
-
-
-
-
-
-
-
-# Reg 1 Lasso
-lasso_no_pen <- glmnet(
-  x = X0,
-  y = Y,
-  alpha = 1, #lasso
-  lambda=0
+modelo3 <- train(
+  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+    distancia_swimming_pool,
+  data = train_df,
+  method="gbm_h2o",
+  trControl=cv3,
+  metric='RMSE',
+  tuneGrid=tunegrid_gbm
 )
 
-lasso_no_pen$beta
-summary(lm(Y~X0))
+# Notas: No sé por qué no me funcionó, revisar
+
+#______________________________________
+# Notas generales: 
+
+# 1. El analisis descriptivo puede ser como en este libro:
+# https://bloqueneon.uniandes.edu.co//content/enforced/205135-UN_202313_MECA_4107_13/05_Trees_n_Boosting.html?ou=205135
+
+# 2. Recordar que se puso la variable price en ln, al final de cada modelo hay que retornarla y ver su performance.
+
+# 3. Completar la parte de autocorrelacion espacial (Elastic net), ya que es logico que haya autocorrelacion
+
+# 3. Mejorar los modelos consiste en cambiar los hiperparametros de cada modelo, añadir o mejorar variables, encontrar
+# el numero optimo de particion entre train y test para que mejore la prediccion fuera de muestra pero que no se demore tanto,
+# eso toca a ojo.
+
+# 4. Entender muy bien el significado de cada hiperparametro en cada modelo para explicar por que seleccionamos los nuestros 
+# en el doc
+
+# 5. Si queda tiempo, se pueden probar otros modelos, tomando como base: 
+# https://topepo.github.io/caret/available-models.html
+
+# 6. Si nos sigue sobrando tiempo, probar ridge y lasso
 
 
 
@@ -389,37 +346,5 @@ summary(lm(Y~X0))
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## CART ####
-
-
-
-## Bosque ####
-
-
-
-
-
-
-
-# Test --------------------------------------------------------------------
-
-
-# Completar base
-base <- left_join(db, submission_template, by = "property_id")
-summary(base)
 
 
