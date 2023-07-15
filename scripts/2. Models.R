@@ -36,6 +36,8 @@ p_load(tidyverse,rio,
        stargazer,
        glmnet)
 
+pacman::p_load(sf, spatialRF, purrr)
+
 
 # Import data -------------------------------------------------------------
 load("../stores/data.Rdata")
@@ -108,8 +110,26 @@ merged_data_sf <- st_as_sf(
 )
 
 p_load(spatialsample,sf)
-buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=40,buffer=5)
+buffer_folds <- spatial_buffer_vfold_cv(merged_data_sf, radius=5,buffer=0.5)
 
+# Función para realizar la validación cruzada en cada parte
+perform_spatial_cv <- function(data, radius, buffer) {
+  spatial_buffer_vfold_cv(data, radius = radius, buffer = buffer)
+}
+
+# Tamaño de cada parte 
+part_size <- 1000
+
+# División del conjunto de datos en partes más pequeñas
+data_parts <- split(merged_data_sf, rep(1:(nrow(merged_data_sf) %/% part_size), each = part_size, length.out = nrow(merged_data_sf)))
+
+# ACA EMPIEZA:Realizar la validación cruzada en cada parte
+buffer_folds_list <- lapply(data_parts, function(part_data) {
+  perform_spatial_cv(part_data, radius = 5, buffer = 0.5)
+})
+
+# Combinar los resultados de la validación cruzada
+buffer_folds <- do.call("rbind", buffer_folds_list)
 # Grafica
 autoplot(buffer_folds)
 
@@ -172,11 +192,6 @@ MAPE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
 MAE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
 
-
-
-
-
-
 ## Loocv Model 2 ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
 modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
@@ -187,7 +202,6 @@ modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bath
                                 method = 'lm',
                                 trControl= ctrl_loocv )
 modelo2_caret_loocv_lm
-
 
 ## Evaluar modelo loocv 
 y_hat_insample_loocv2 <- predict(modelo2_caret_loocv_lm,train_df)
@@ -239,10 +253,6 @@ MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 
 # Notas: Este es un modelo simple en el que no se modifican los grid
-
-
-
-
 
 ## Ranger Model ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
