@@ -39,40 +39,47 @@ p_load(tidyverse,rio,
 
 # Import data -------------------------------------------------------------
 load("../stores/data.Rdata")
-
 url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
 submission_template <- read.csv(url_submission_template)
 
-base <- left_join(db, submission_template, by = "property_id")
-summary(base)
+# Unir las bases de datos por "property_id"
+merged_data <- merge(db, submission_template, by = "property_id", all.x = TRUE)
 
-base$price.x <- ifelse(is.na(base$price.x), base$price.y, base$price.x)
-summary(base)
+# Reemplazar los NAs en "price" de data2 con los valores no NA de data1
+merged_data$price <- ifelse(is.na(merged_data$price.x), merged_data$price.y, merged_data$price.x)
 
+# Quitar las columnas redundantes
+merged_data <- merged_data[, !(names(merged_data) %in% c("price.x", "price.y"))]
 
+# Depurar
+rm(db_merge)
+rm(submission_template)
+summary(merged_data$price)
+merged_data[is.na(merged_data)] <- 0
 
 # Transforming data -------------------------------------------------------
-
 # Create ln_price
-base$ln_price <- log(base$price.x)
-base[is.na(base)] <- 0
+merged_data$ln_price <- log(merged_data$price)
 
-# Train/Test
-set.seed(123)
-sample <- sample(c(TRUE, FALSE), nrow(base), replace=TRUE, prob=c(0.7,0.3))
-sum(sample)/nrow(base)
-train  <- base[sample, ] 
-test   <- base[!sample, ] 
+# Train/test
+p_load(caret)
+train.index <- createDataPartition(merged_data$ln_price, p=0.8)$Resample1
+train_df <- merged_data[train.index,]
+test_df <- merged_data[-train.index,]
+
+# Observar si los grupos quedaron balanceados
+summary(train_df$ln_price)
+summary(test_df$ln_price)
 
 
 # View data ---------------------------------------------------------------
-ggplot(train, aes(x = price.x)) +
+ggplot(train_df, aes(x = ln_price)) +
   geom_histogram(fill = "darkblue") +
   theme_bw() +
   labs(x = "Precio de venta", y = "Cantidad")
 
 # Descriptivas - Variable de interes (precio)
-summary(train$price.x) %>%
+summary(train_df$ln_price) %>%
   as.matrix() %>%
   as.data.frame() %>%
   mutate(V1 = scales::dollar(V1))
@@ -80,6 +87,100 @@ summary(train$price.x) %>%
 
 
 # Models ------------------------------------------------------------------
+# RPart Model ####
+cv3 <- trainControl(method = "cv", number = 5)
+
+modelo1 <- train(
+  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+    distancia_swimming_pool,
+  data = train_df,
+  method="rpart",
+  trControl=cv3,
+  metric="RMSE",
+  maximize=F
+)
+
+p_load(rattle)
+modelo1$finalModel
+fancyRpartPlot(modelo1$finalModel)
+
+## Evaluar modelo RPart ####
+
+y_hat_insample1 <- predict(modelo1,train_df)
+y_hat_outsample1 <- predict(modelo1,test_df)
+
+p_load(MLmetrics)
+
+# Insample
+MAE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
+
+
+# Ranger Model ####
+# Grid
+p_load(ranger)
+
+tungrid_rf <- expand.grid(
+  min.node.size=c(10,30,50,70,100),
+  mtry=c(3,5,10),
+  splitrule=c("variance")
+)
+
+
+modelo2 <- train(
+  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+    distancia_swimming_pool,
+  data = train_df,
+  method="ranger",
+  trControl=cv3,
+  metric="RMSE",
+  maximize=F,
+  tuneGrid=tungrid_rf
+)
+
+p_load(rattle)
+modelo1$finalModel
+fancyRpartPlot(modelo1$finalModel)
+
+## Evaluar modelo Ranger ####
+
+y_hat_insample1 <- predict(modelo1,train_df)
+y_hat_outsample1 <- predict(modelo1,test_df)
+
+p_load(MLmetrics)
+
+# Insample
+MAE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## LM ####
 ### Modelo 1 lm ####
 model1_lm<-lm(ln_price~1, data = train)
@@ -138,7 +239,7 @@ ctrl <- trainControl(
   number = 5) # número de folds
 
 modelo1_caret_lm <- train(ln_price~surface_covered_new, 
-                      data = base, 
+                      data = train, 
                       method = 'lm',
                       trControl= ctrl )
 
@@ -149,7 +250,7 @@ ctrl_loocv <- trainControl(
   method = "loocv")
 
 modelo1_caret_loocv_lm <- train(ln_price~surface_covered_new, 
-                            data = base, 
+                            data = train, 
                             method = 'lm',
                             trControl= ctrl_loocv )
 modelo1_caret_loocv_lm
@@ -159,7 +260,7 @@ modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bath
                                   parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
                                   Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
                                   distancia_swimming_pool, 
-                                data = base, 
+                                data = train, 
                                 method = 'lm',
                                 trControl= ctrl_loocv )
 modelo2_caret_loocv_lm
@@ -169,12 +270,12 @@ modelo2_caret_loocv_lm
 ## Ridge ####
 ## Groups
 # Variables X
-names(base)
-X0 <- as.matrix(base  %>% select(-property_id,-geometry,
-                                 -price.x,-ln_price,-surface_covered))
+names(train)
+X0 <- as.matrix(train  %>% select(-property_id,-price,-surface_covered,-geometry,
+                                  -ln_price))
 
 # Variable Y
-Y <- as.matrix(base$ln_price)
+Y <- train$ln_price
 
 ## Models
 # Model 1
@@ -183,6 +284,36 @@ ridge0 <- glmnet(
   y = Y,
   alpha = 0 #ridge
 )
+
+
+library(glmnet)
+
+# Variables X
+X0 <- as.matrix(train %>% 
+                  dplyr::select(-property_id, -price, -surface_covered, -geometry, -ln_price))
+
+# Variable Y
+Y <- as.matrix(train$ln_price)
+class(Y)
+
+## Models
+# Model 1
+ridge0 <- glmnet(x = X0, y = Y, alpha = 0)
+
+
+
+
+# Variables X
+names(train)
+X0 <- sparse.model.matrix(~ . - property_id - price - surface_covered - geometry - ln_price, data = train)
+
+# Variable Y
+Y <- train$ln_price
+
+## Models
+# Model 1
+ridge0 <- glmnet(x = X0, y = Y, alpha = 0)
+
 
 # Grafica 1 ridge
 plot(ridge0, xvar = "lambda")
@@ -198,7 +329,7 @@ ridge1<-train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
                parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
                Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
                distancia_swimming_pool,
-             data=base,
+             data=train,
              method = 'glmnet', 
              trControl = fitControl,
              tuneGrid = expand.grid(alpha = 0, #Ridge
@@ -224,12 +355,13 @@ lasso<-train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
                parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
                Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
                distancia_swimming_pool,
-             data=base,
+             data=train,
              method = 'glmnet', 
              trControl = fitControl,
              tuneGrid = expand.grid(alpha = 1, #lasso
                                     lambda = ridge0$lambda)
 ) 
+
 
 ## Compare Ridge-Lasso
 RMSE_df <- cbind()
@@ -283,5 +415,11 @@ summary(lm(Y~X0))
 
 
 
+# Test --------------------------------------------------------------------
+
+
+# Completar base
+base <- left_join(db, submission_template, by = "property_id")
+summary(base)
 
 
