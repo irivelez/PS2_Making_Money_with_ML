@@ -121,7 +121,6 @@ autoplot(block_folds)
 
 #___________________________
 ### Folds
-
 set.seed(0101)
 cv3 <- trainControl(method = "cv", number = 5)
 #__________________________
