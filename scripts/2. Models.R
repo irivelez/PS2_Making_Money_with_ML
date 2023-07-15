@@ -63,7 +63,7 @@ merged_data$ln_price <- log(merged_data$price)
 
 # Train/test
 p_load(caret)
-train.index <- createDataPartition(merged_data$ln_price, p=0.8)$Resample1
+train.index <- createDataPartition(merged_data$ln_price, p=0.2)$Resample1
 train_df <- merged_data[train.index,]
 test_df <- merged_data[-train.index,]
 
@@ -88,6 +88,8 @@ summary(train_df$ln_price) %>%
 
 # Models ------------------------------------------------------------------
 # RPart Model ####
+# Para correr este modelo se tuvo una proporción 0.8 en los datos de train
+
 cv3 <- trainControl(method = "cv", number = 5)
 
 modelo1 <- train(
@@ -123,6 +125,8 @@ MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
 
 
 # Ranger Model ####
+# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+
 # Grid
 p_load(ranger)
 
@@ -131,7 +135,6 @@ tungrid_rf <- expand.grid(
   mtry=c(3,5,10),
   splitrule=c("variance")
 )
-
 
 modelo2 <- train(
   ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
@@ -146,28 +149,25 @@ modelo2 <- train(
   tuneGrid=tungrid_rf
 )
 
-p_load(rattle)
-modelo1$finalModel
-fancyRpartPlot(modelo1$finalModel)
+plot(modelo2)
 
 ## Evaluar modelo Ranger ####
 
-y_hat_insample1 <- predict(modelo1,train_df)
-y_hat_outsample1 <- predict(modelo1,test_df)
-
-p_load(MLmetrics)
+y_hat_insample2 <- predict(modelo2,train_df)
+y_hat_outsample2 <- predict(modelo2,test_df)
 
 # Insample
-MAE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
+MAE(y_pred = y_hat_insample2, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample2, y_true = train_df$ln_price)
 
 # Outsample
-MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
+MAE(y_pred = y_hat_outsample2, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_outsample2, y_true = train_df$ln_price)
 
 
-
-
+# Notas modelo Ranger
+# Se puede revisar si aumentar la proporción para que la evaluación fuera de muestra sea mejor
+# Sobre el desempleño, se pueden cambiar los parámetros, tal vez min.node.size pueda empezar desde antes
 
 
 
