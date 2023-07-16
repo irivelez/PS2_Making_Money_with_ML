@@ -64,7 +64,7 @@ merged_data[is.na(merged_data)] <- 0
 merged_data$ln_price <- log(merged_data$price)
 
 # Dividiendo la muestra en train/test ------------------------------------------
-train.index <- createDataPartition(merged_data$ln_price, p=0.3)$Resample1
+train.index <- createDataPartition(merged_data$ln_price, p=0.4)$Resample1
 train_df <- merged_data[train.index, ]
 test_df <- merged_data[-train.index, ]
 
@@ -129,6 +129,7 @@ modelo1_caret_lm
 ## Evaluar modelo LM
 y_hat_insample_lm <- predict(modelo1_caret_lm, train_df)
 y_hat_outsample_lm <- predict(modelo1_caret_lm, base_fin_test)
+y_hat_outsample_lm_cop <- exp(y_hat_outsample_lm)
 
 # Insample
 MAE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
@@ -136,6 +137,7 @@ MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 
 # Outsample
 MAE(y_pred = y_hat_outsample_lm, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_lm_cop, y_true = base_fin_test$price)
 MAPE(y_pred = y_hat_outsample_lm, y_true = base_fin_test$ln_price)
 
 results <- data.frame(ID = test_df$property_id, Pred_Price = y_hat_outsample_lm)
@@ -143,7 +145,7 @@ write.csv(results, "predicciones.csv", row.names = FALSE)
 
 
 ## Loocv Model 1 ####
-# Este modelo se entrenó con el 20% de los datos para ahorrar tiempo
+# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
 ctrl_loocv <- trainControl(method = "loocv")
 
 modelo1_caret_loocv_lm <- train(ln_price ~ surface_covered_new, 
@@ -163,13 +165,14 @@ MAPE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
 
 # Outsample
 MAE(y_pred = y_hat_outsample_loocv, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_loocv_cop, y_true = base_fin_test$price)
 MAPE(y_pred = y_hat_outsample_loocv, y_true = base_fin_test$ln_price)
 
 results_1 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_loocv_cop)
 write.csv(results, "predicciones_1.csv", row.names = FALSE)
 
 ## Loocv Model 2 ####
-# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
+# Este modelo se entrenó con el 40% de los datos para ahorrar tiempo
 modelo2_caret_loocv_lm <- train(ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
                                   parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
                                   Es_apartamento + distancia_parque + area_parque + distancia_sport_centre +
@@ -189,7 +192,11 @@ MAE(y_pred = y_hat_insample_loocv2, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_insample_loocv2, y_true = train_df$ln_price)
 
 # Outsample
+# Se presentaron valores muy locos para el MAE en COP.
 MAE(y_pred = y_hat_outsample_loocv2, y_true = base_fin_test$ln_price)
+mae2_loocv <- MAE(y_pred = y_hat_outsample_loocv2_cop, y_true = base_fin_test$price)
+mae2_loocv <- format(mae2_loocv, scientific = FALSE)
+print(mae2_loocv)
 MAPE(y_pred = y_hat_outsample_loocv2, y_true = base_fin_test$ln_price)
 
 results_2 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_loocv2_cop)
@@ -197,7 +204,7 @@ write.csv(results, "predicciones_2.csv", row.names = FALSE)
 
 
 ## Ranger Model ####
-# Este modelo se entrenó con el 20% de los datos para ahorrar tiempo
+# Este modelo se entrenó con el 40% de los datos para ahorrar tiempo
 # Grid
 p_load(ranger)
 
@@ -222,9 +229,15 @@ modelo_ranger <- train(
 
 plot(modelo_ranger)
 
+
 ## Evaluar modelo Ranger 
 y_hat_outsample_ranger1 <- predict(modelo_ranger, base_fin_test)
 y_hat_outsample_ranger1_cop <- exp(y_hat_outsample_ranger1)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_ranger1, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_ranger1_cop, y_true = base_fin_test$price)
+MAPE(y_pred = y_hat_outsample_ranger1, y_true = base_fin_test$ln_price)
 
 results_4 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger1_cop)
 write.csv(results_4, file = "../outputs/predicciones_4.csv", row.names = FALSE)
