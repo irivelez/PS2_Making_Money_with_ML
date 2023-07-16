@@ -376,10 +376,14 @@ modelo3 <- train(
 
 install.packages("xgboost")
 library(xgboost)
+train_df$bedrooms <- as.numeric(train_df$bedrooms)
+
 
 # Definir la matriz de características y la variable objetivo
-X <- train_df[, c("surface_covered_new", "rooms", "bedrooms", "bathrooms", "parqueaderoT", "ascensorT", "bañoprivado", "balcon", "vista", "remodelado", "Es_apartamento", "distancia_parque", "area_parque", "distancia_sport_centre", "distancia_swimming_pool")]
+X <- train_df[, c("surface_covered_new", "rooms", "bathrooms", "parqueaderoT", "ascensorT", "bañoprivado", "balcon", "vista", "remodelado", "Es_apartamento", "distancia_parque", "area_parque", "distancia_sport_centre", "distancia_swimming_pool")]
 y <- train_df$ln_price
+
+
 
 # Definir la grilla de afinamiento
 tunegrid_xgboost <- expand.grid(
