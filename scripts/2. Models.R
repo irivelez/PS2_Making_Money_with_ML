@@ -2,7 +2,7 @@
 #         Problem Set 2. Making Money with ML?
 #           Big data and Machine Learning
 #             Universidad de los Andes
-##########################################################
+#___________________________________________________________
 
 #Authors:
 
@@ -11,7 +11,7 @@
 #- Irina Andrea Vélez López  
 #- Daniel Casas Bautista  
 
-# Initial configuration ---------------------------------------------------
+# Initial configuration --------------------------------------------------------
 
 rm(list = ls())
 
@@ -20,7 +20,7 @@ path_folder <- dirname(path_sript)
 setwd(path_folder)
 
 
-## llamado librerías de la sesión
+# Librerías para la sesión de trabajo ------------------------------------------
 if(!require(pacman)) install.packages("pacman")
 require(pacman)
 
@@ -39,12 +39,13 @@ p_load(tidyverse,rio,
 
 pacman::p_load(sf, spatialRF, purrr)
 
-
 # Import data -------------------------------------------------------------
 load("../stores/data.Rdata")
+load("../stores/base_fin_test.Rdata")
 url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
 submission_template <- read.csv(url_submission_template)
 
+# Transforming data -------------------------------------------------------------
 # Unir las bases de datos por "property_id"
 merged_data <- merge(db, submission_template, by = "property_id", all.x = TRUE)
 
@@ -59,13 +60,12 @@ rm(submission_template)
 summary(merged_data$price)
 merged_data[is.na(merged_data)] <- 0
 
-# Transforming data -------------------------------------------------------
 # Create ln_price
 merged_data$ln_price <- log(merged_data$price)
 
-# Train/test
+# Dividiendo la muestra en Train/test ------------------------------------------
 p_load(caret)
-train.index <- createDataPartition(merged_data$ln_price, p=0.2)$Resample1
+train.index <- createDataPartition(merged_data$ln_price, p=0.3)$Resample1
 train_df <- merged_data[train.index,]
 test_df <- merged_data[-train.index,]
 
@@ -85,7 +85,7 @@ ggplot(test_df, aes(x = ln_price)) +
 
 
 
-# Descriptivas - Variable de interes (precio)
+# Análisis descriptivo (precio) ------------------------------------------------
 summary(train_df$ln_price) %>%
   as.matrix() %>%
   as.data.frame() %>%
@@ -97,9 +97,7 @@ summary(test_df$ln_price) %>%
   as.data.frame() %>%
   mutate(V1 = scales::dollar(V1))
 
-# Models ------------------------------------------------------------------
-
-## Spatial Dependence ------------------------------------------------------
+# Spatial Dependence ------------------------------------------------------
 merged_data_sf <- st_as_sf(
   merged_data,
   # "coords" is in x/y order -- so longitude goes first!
@@ -109,8 +107,7 @@ merged_data_sf <- st_as_sf(
   crs = 4326
 )
 
-
-# Spatial Blocks
+# Spatial Blocks ----------------------------------------------------------
 p_load(spatialsample,sf)
 
 install.packages("caret")
@@ -118,12 +115,9 @@ require("caret")
 
 set.seed(1357)
 block_folds <- spatial_block_cv(method ="cv", v = 5)
-
-block_folds <- spatial_block_cv(merged_data_sf, v = 5)
 autoplot(block_folds)
 
-
-#__________________________
+# Models ------------------------------------------------------------------
 
 ## LM Model ####
 # Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
@@ -138,6 +132,12 @@ modelo1_caret_lm
 ## Evaluar modelo LM
 y_hat_insample_lm <- predict(modelo1_caret_lm,train_df)
 y_hat_outsample_lm <- predict(modelo1_caret_lm,test_df)
+
+results <- data.frame(ID = test_df$property_id, Pred_Price = y_hat_outsample_lm)
+
+write.csv(results, "predicciones.csv", row.names = FALSE)
+
+
 
 p_load(MLmetrics)
 # Insample
@@ -260,7 +260,7 @@ modelo2 <- train(
     distancia_swimming_pool,
   data = train_df,
   method="ranger",
-  trControl=cv3,
+  trControl=block_folds,
   metric="RMSE",
   maximize=F,
   tuneGrid=tungrid_rf
@@ -270,16 +270,74 @@ plot(modelo2)
 
 ## Evaluar modelo Ranger 
 
-y_hat_insample2 <- predict(modelo2,train_df)
-y_hat_outsample2 <- predict(modelo2,test_df)
+y_hat_outsample_ranger1 <- predict(modelo2, base_fin_test)
+y_hat_outsample_ranger1_cop <- exp(y_hat_outsample_ranger1)
 
-# Insample
-MAE(y_pred = y_hat_insample2, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_insample2, y_true = train_df$ln_price)
+results_4 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger1_cop)
+write.csv(results_4, "predicciones_4.csv", row.names = FALSE)
 
-# Outsample
-MAE(y_pred = y_hat_outsample2, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_outsample2, y_true = train_df$ln_price)
+
+## Modelo Ranger 2
+
+tungrid_rf <- expand.grid(
+  min.node.size=c(5,10,30,50),
+  mtry=c(3,5,10),
+  splitrule=c("variance")
+)
+
+modelo3 <- train(
+  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+    distancia_swimming_pool,
+  data = train_df,
+  method="ranger",
+  trControl=block_folds,
+  metric="RMSE",
+  maximize=F,
+  tuneGrid=tungrid_rf
+)
+
+plot(modelo3)
+
+## Evaluar modelo Ranger 
+
+y_hat_outsample_ranger2 <- predict(modelo3, base_fin_test)
+y_hat_outsample_ranger2_cop <- exp(y_hat_outsample_ranger2)
+
+results_5 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger2_cop)
+write.csv(results_5, "predicciones_5.csv", row.names = FALSE)
+
+## Modelo Ranger 3
+
+tungrid_rf <- expand.grid(
+  min.node.size=c(10,20,30,40,50,70),
+  mtry=c(10,12,15),
+  splitrule=c("variance")
+)
+
+modelo4 <- train(
+  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
+    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
+    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+    distancia_swimming_pool,
+  data = train_df,
+  method="ranger",
+  trControl=block_folds,
+  metric="RMSE",
+  maximize=F,
+  tuneGrid=tungrid_rf
+)
+
+plot(modelo4)
+
+## Evaluar modelo Ranger 
+
+y_hat_outsample_ranger3 <- predict(modelo4, base_fin_test)
+y_hat_outsample_ranger3_cop <- exp(y_hat_outsample_ranger3)
+
+results_7 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger3_cop)
+write.csv(results_7, "predicciones_7.csv", row.names = FALSE)
 
 
 # Notas modelo Ranger
@@ -289,7 +347,8 @@ MAPE(y_pred = y_hat_outsample2, y_true = train_df$ln_price)
 
 
 ## Boosting Model ####
-install.packages("h2o")
+install.packages("h2o", repos = "https://cran.r-project.org")
+
 library(h2o)
 h2o.init(nthreads = 4)
 
@@ -312,6 +371,33 @@ modelo3 <- train(
   metric='RMSE',
   tuneGrid=tunegrid_gbm
 )
+
+### 
+
+install.packages("xgboost")
+library(xgboost)
+
+# Definir la matriz de características y la variable objetivo
+X <- train_df[, c("surface_covered_new", "rooms", "bedrooms", "bathrooms", "parqueaderoT", "ascensorT", "bañoprivado", "balcon", "vista", "remodelado", "Es_apartamento", "distancia_parque", "area_parque", "distancia_sport_centre", "distancia_swimming_pool")]
+y <- train_df$ln_price
+
+# Definir la grilla de afinamiento
+tunegrid_xgboost <- expand.grid(
+  eta = c(0.1, 0.01, 0.001),
+  nrounds = c(50, 100, 500),
+  max_depth = 10,
+  min_child_weight = 70,
+  subsample = 0.2
+)
+
+# Ajustar el modelo de boosting
+modelo3 <- xgboost(data = as.matrix(X), label = y, objective = "reg:linear", nthread = -1,
+                   eta = tunegrid_xgboost$eta, nrounds = tunegrid_xgboost$nrounds,
+                   max_depth = tunegrid_xgboost$max_depth, min_child_weight = tunegrid_xgboost$min_child_weight,
+                   subsample = tunegrid_xgboost$subsample, eval_metric = "rmse")
+
+
+  
 
 # Notas: No sé por qué no me funcionó, revisar
 
