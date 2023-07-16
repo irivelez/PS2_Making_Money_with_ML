@@ -37,11 +37,11 @@ p_load(tidyverse,rio,
        stargazer,
        glmnet)
 
+p_load(caret)
 pacman::p_load(sf, spatialRF, purrr)
 
 # Import data -------------------------------------------------------------
 load("../stores/data.Rdata")
-load("../stores/base_fin_test.Rdata")
 url_submission_template <- "https://raw.githubusercontent.com/irivelez/PS2_Making_Money_with_ML/master/stores/submission_template.csv"
 submission_template <- read.csv(url_submission_template)
 
@@ -63,13 +63,12 @@ merged_data[is.na(merged_data)] <- 0
 # Create ln_price
 merged_data$ln_price <- log(merged_data$price)
 
-# Dividiendo la muestra en Train/test ------------------------------------------
-p_load(caret)
+# Dividiendo la muestra en train/test ------------------------------------------
 train.index <- createDataPartition(merged_data$ln_price, p=0.3)$Resample1
-train_df <- merged_data[train.index,]
-test_df <- merged_data[-train.index,]
+train_df <- merged_data[train.index, ]
+test_df <- merged_data[-train.index, ]
 
-# Observar si los grupos quedaron balanceados y visualizar la distribución de los datos
+# Observar si los grupos quedaron balanceados y ver la distribución de los datos
 summary(train_df$ln_price)
 summary(test_df$ln_price)
 
@@ -84,8 +83,7 @@ ggplot(test_df, aes(x = ln_price)) +
   labs(x = "Precio de venta", y = "Cantidad")
 
 
-
-# Análisis descriptivo (precio) ------------------------------------------------
+# Análisis descriptivo (Precio) ------------------------------------------------
 summary(train_df$ln_price) %>%
   as.matrix() %>%
   as.data.frame() %>%
@@ -97,7 +95,7 @@ summary(test_df$ln_price) %>%
   as.data.frame() %>%
   mutate(V1 = scales::dollar(V1))
 
-# Spatial Dependence ------------------------------------------------------
+# Spatial Blocks ---------------------------------------------------------------
 merged_data_sf <- st_as_sf(
   merged_data,
   # "coords" is in x/y order -- so longitude goes first!
@@ -107,77 +105,74 @@ merged_data_sf <- st_as_sf(
   crs = 4326
 )
 
-# Spatial Blocks ----------------------------------------------------------
 p_load(spatialsample,sf)
 
-install.packages("caret")
-require("caret")
-
 set.seed(1357)
-block_folds <- spatial_block_cv(method ="cv", v = 5)
+block_folds <- spatial_block_cv(merged_data_sf, v = 5)
+
 autoplot(block_folds)
 
 # Models ------------------------------------------------------------------
 
+load("../stores/base_fin_test.Rdata")
+p_load(MLmetrics)
+
 ## LM Model ####
-# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
+# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
 block_folds <- trainControl(method = "CV", number = 5)
-modelo1_caret_lm <- train(ln_price~surface_covered_new, 
+modelo1_caret_lm <- train(ln_price ~ surface_covered_new, 
                           data = train_df, 
                           method = 'lm',
                           trControl= block_folds )
-
 modelo1_caret_lm
 
 ## Evaluar modelo LM
-y_hat_insample_lm <- predict(modelo1_caret_lm,train_df)
-y_hat_outsample_lm <- predict(modelo1_caret_lm,test_df)
+y_hat_insample_lm <- predict(modelo1_caret_lm, train_df)
+y_hat_outsample_lm <- predict(modelo1_caret_lm, base_fin_test)
 
-results <- data.frame(ID = test_df$property_id, Pred_Price = y_hat_outsample_lm)
-
-write.csv(results, "predicciones.csv", row.names = FALSE)
-
-
-
-p_load(MLmetrics)
 # Insample
 MAE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_insample_lm, y_true = train_df$ln_price)
 
 # Outsample
-MAE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_outsample_lm, y_true = train_df$ln_price)
+MAE(y_pred = y_hat_outsample_lm, y_true = base_fin_test$ln_price)
+MAPE(y_pred = y_hat_outsample_lm, y_true = base_fin_test$ln_price)
 
+results <- data.frame(ID = test_df$property_id, Pred_Price = y_hat_outsample_lm)
+write.csv(results, "predicciones.csv", row.names = FALSE)
 
 
 ## Loocv Model 1 ####
-# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
-ctrl_loocv <- trainControl(
-  method = "loocv")
+# Este modelo se entrenó con el 20% de los datos para ahorrar tiempo
+ctrl_loocv <- trainControl(method = "loocv")
 
-modelo1_caret_loocv_lm <- train(ln_price~surface_covered_new, 
+modelo1_caret_loocv_lm <- train(ln_price ~ surface_covered_new, 
                                 data = train_df, 
                                 method = 'lm',
                                 trControl= ctrl_loocv )
 modelo1_caret_loocv_lm
 
 ## Evaluar modelo loocv 
-y_hat_insample_loocv <- predict(modelo1_caret_loocv_lm,train_df)
-y_hat_outsample_loocv <- predict(modelo1_caret_loocv_lm,test_df)
+y_hat_insample_loocv <- predict(modelo1_caret_loocv_lm, train_df)
+y_hat_outsample_loocv <- predict(modelo1_caret_loocv_lm, base_fin_test)
+y_hat_outsample_loocv_cop <- exp(y_hat_outsample_loocv)
 
 # Insample
 MAE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_insample_loocv, y_true = train_df$ln_price)
 
 # Outsample
-MAE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_outsample_loocv, y_true = train_df$ln_price)
+MAE(y_pred = y_hat_outsample_loocv, y_true = base_fin_test$ln_price)
+MAPE(y_pred = y_hat_outsample_loocv, y_true = base_fin_test$ln_price)
+
+results_1 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_loocv_cop)
+write.csv(results, "predicciones_1.csv", row.names = FALSE)
 
 ## Loocv Model 2 ####
-# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
-modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-                                  parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-                                  Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
+modelo2_caret_loocv_lm <- train(ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
+                                  parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
+                                  Es_apartamento + distancia_parque + area_parque + distancia_sport_centre +
                                   distancia_swimming_pool, 
                                 data = train_df, 
                                 method = 'lm',
@@ -185,65 +180,24 @@ modelo2_caret_loocv_lm <- train(ln_price~surface_covered_new+rooms+bedrooms+bath
 modelo2_caret_loocv_lm
 
 ## Evaluar modelo loocv 
-y_hat_insample_loocv2 <- predict(modelo2_caret_loocv_lm,train_df)
-y_hat_outsample_loocv2 <- predict(modelo2_caret_loocv_lm,test_df)
+y_hat_insample_loocv2 <- predict(modelo2_caret_loocv_lm, train_df)
+y_hat_outsample_loocv2 <- predict(modelo2_caret_loocv_lm, base_fin_test)
+y_hat_outsample_loocv2_cop <- exp(y_hat_outsample_loocv2)
 
 # Insample
 MAE(y_pred = y_hat_insample_loocv2, y_true = train_df$ln_price)
 MAPE(y_pred = y_hat_insample_loocv2, y_true = train_df$ln_price)
 
 # Outsample
-MAE(y_pred = y_hat_outsample_loocv2, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_outsample_loocv2, y_true = train_df$ln_price)
+MAE(y_pred = y_hat_outsample_loocv2, y_true = base_fin_test$ln_price)
+MAPE(y_pred = y_hat_outsample_loocv2, y_true = base_fin_test$ln_price)
 
+results_2 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_loocv2_cop)
+write.csv(results, "predicciones_2.csv", row.names = FALSE)
 
-
-
-## RPart Model ####
-# Para correr este modelo se tuvo una proporción 0.8 en los datos de train
-
-modelo1 <- train(
-  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
-    distancia_swimming_pool,
-  data = train_df,
-  method ="rpart",
-  trControl = ctrl_loocv,
-  metric ="RMSE",
-  maximize = F
-)
-
-results <- data.frame(model = factor (c("modelo1_caret_lm", 
-                                        "modelo1_caret_loocv_lm",
-                                        "modelo2_caret_loocv_lm"), 
-                                      ordered = TRUE))
-results
-
-p_load(rattle)
-modelo1$finalModel
-fancyRpartPlot(modelo1$finalModel)
-
-## Evaluar modelo RPart
-
-y_hat_insample1 <- predict(modelo1,train_df)
-y_hat_outsample1 <- predict(modelo1,test_df)
-
-p_load(MLmetrics)
-
-# Insample
-MAE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_insample1, y_true = train_df$ln_price)
-
-# Outsample
-MAE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
-MAPE(y_pred = y_hat_outsample1, y_true = train_df$ln_price)
-
-# Notas: Este es un modelo simple en el que no se modifican los grid
 
 ## Ranger Model ####
-# Para correr este modelo se tuvo que pasar de una proporción en los datos de train de 0.2 para que funcionara
-
+# Este modelo se entrenó con el 20% de los datos para ahorrar tiempo
 # Grid
 p_load(ranger)
 
@@ -253,7 +207,7 @@ tungrid_rf <- expand.grid(
   splitrule=c("variance")
 )
 
-modelo2 <- train(
+modelo_ranger <- train(
   ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
     parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
     Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
@@ -266,26 +220,25 @@ modelo2 <- train(
   tuneGrid=tungrid_rf
 )
 
-plot(modelo2)
+plot(modelo_ranger)
 
 ## Evaluar modelo Ranger 
-
-y_hat_outsample_ranger1 <- predict(modelo2, base_fin_test)
+y_hat_outsample_ranger1 <- predict(modelo_ranger, base_fin_test)
 y_hat_outsample_ranger1_cop <- exp(y_hat_outsample_ranger1)
 
 results_4 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger1_cop)
-write.csv(results_4, "predicciones_4.csv", row.names = FALSE)
+write.csv(results_4, file = "../outputs/predicciones_4.csv", row.names = FALSE)
 
 
 ## Modelo Ranger 2
-
+# Grid
 tungrid_rf <- expand.grid(
   min.node.size=c(5,10,30,50),
   mtry=c(3,5,10),
   splitrule=c("variance")
 )
 
-modelo3 <- train(
+modelo_ranger2 <- train(
   ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
     parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
     Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
@@ -298,25 +251,24 @@ modelo3 <- train(
   tuneGrid=tungrid_rf
 )
 
-plot(modelo3)
+plot(modelo_ranger2)
 
 ## Evaluar modelo Ranger 
-
-y_hat_outsample_ranger2 <- predict(modelo3, base_fin_test)
+y_hat_outsample_ranger2 <- predict(modelo_ranger2, base_fin_test)
 y_hat_outsample_ranger2_cop <- exp(y_hat_outsample_ranger2)
 
 results_5 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger2_cop)
-write.csv(results_5, "predicciones_5.csv", row.names = FALSE)
+write.csv(results_5, file = "../outputs/predicciones_5.csv", row.names = FALSE)
 
 ## Modelo Ranger 3
-
+# Grid
 tungrid_rf <- expand.grid(
   min.node.size=c(10,20,30,40,50,70),
   mtry=c(10,12,15),
   splitrule=c("variance")
 )
 
-modelo4 <- train(
+modelo_ranger3 <- train(
   ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
     parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
     Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
@@ -329,28 +281,57 @@ modelo4 <- train(
   tuneGrid=tungrid_rf
 )
 
-plot(modelo4)
+plot(modelo_ranger3)
 
 ## Evaluar modelo Ranger 
-
-y_hat_outsample_ranger3 <- predict(modelo4, base_fin_test)
+y_hat_outsample_ranger3 <- predict(modelo_ranger3, base_fin_test)
 y_hat_outsample_ranger3_cop <- exp(y_hat_outsample_ranger3)
 
 results_7 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger3_cop)
-write.csv(results_7, "predicciones_7.csv", row.names = FALSE)
-
+write.csv(results_7, file = "../outputs/predicciones_7.csv", row.names = FALSE)
 
 # Notas modelo Ranger
-# Se puede revisar si aumentar la proporción para que la evaluación fuera de muestra sea mejor
+# Se puede revisar si al aumentar la proporción del train sea mejor fuera de muestra
 # Sobre el desempleño, se pueden cambiar los parámetros, tal vez min.node.size pueda empezar desde antes
 
 
+## RPart Model ####
+# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
+modelo_rpart <- train(
+  ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
+    parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
+    Es_apartamento + distancia_parque + area_parque + distancia_sport_centre +
+    distancia_swimming_pool,
+  data = train_df,
+  method ="rpart",
+  trControl = ctrl_loocv,
+  metric ="RMSE",
+  maximize = F
+)
+
+## Evaluar modelo RPart
+y_hat_insample_rpart <- predict(modelo_rpart,train_df)
+y_hat_outsample_rpart <- predict(modelo_rpart, base_fin_test)
+y_hat_outsample_rpart_cop <- exp(y_hat_outsample_rpar)
+
+# Insample
+MAE(y_pred = y_hat_insample_rpart, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample_rpart, y_true = train_df$ln_price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_rpart, y_true = base_fin_test$ln_price)
+MAPE(y_pred = y_hat_outsample_rpart, y_true = base_fin_test$ln_price)
+
+# Exportar datos para Kaggle
+results_8 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_rpart_cop)
+write.csv(results_8, file = "../outputs/predicciones_8.csv", row.names = FALSE)
+
 
 ## Boosting Model ####
-install.packages("h2o", repos = "https://cran.r-project.org")
-
+# Instalación manual de h2o
+install.packages("/Users/irina/Downloads/h2o_3.40.0.4.tgz", repos = NULL, type = "source")
 library(h2o)
-h2o.init(nthreads = 4)
+h2o.init(nthreads = 5)
 
 tunegrid_gbm <- expand.grid(
   learn_rate=c(0.1, 0.01, 0.001),
@@ -360,50 +341,41 @@ tunegrid_gbm <- expand.grid(
   col_sample_rate=0.2
 )
 
+# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
 modelo3 <- train(
-  ln_price~surface_covered_new+rooms+bedrooms+bathrooms+
-    parqueaderoT+ascensorT+bañoprivado+balcon+vista+remodelado+
-    Es_apartamento+distancia_parque+area_parque+distancia_sport_centre+
+  ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
+    parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
+    Es_apartamento + distancia_parque + area_parque + distancia_sport_centre +
     distancia_swimming_pool,
   data = train_df,
-  method="gbm_h2o",
-  trControl=cv3,
+  method = "gbm_h2o",
+  trControl = block_folds,
   metric='RMSE',
   tuneGrid=tunegrid_gbm
 )
 
-### 
+## Evaluar modelo Boosting
+y_hat_insample_boost <- predict(modelo3,train_df)
+y_hat_outsample_boost <- predict(modelo3, base_fin_test)
+y_hat_outsample_boost_cop <- exp(y_hat_outsample_boost)
 
-install.packages("xgboost")
-library(xgboost)
-train_df$bedrooms <- as.numeric(train_df$bedrooms)
+# Insample
+MAE(y_pred = y_hat_insample_boost, y_true = train_df$ln_price)
+MAPE(y_pred = y_hat_insample_boost, y_true = train_df$ln_price)
 
+# Outsample
+MAE(y_pred = y_hat_outsample_boost, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_boost_cop, y_true = base_fin_test$price)
+MAPE(y_pred = y_hat_outsample_boost, y_true = base_fin_test$ln_price)
 
-# Definir la matriz de características y la variable objetivo
-X <- train_df[, c("surface_covered_new", "rooms", "bathrooms", "parqueaderoT", "ascensorT", "bañoprivado", "balcon", "vista", "remodelado", "Es_apartamento", "distancia_parque", "area_parque", "distancia_sport_centre", "distancia_swimming_pool")]
-y <- train_df$ln_price
-
-
-
-# Definir la grilla de afinamiento
-tunegrid_xgboost <- expand.grid(
-  eta = c(0.1, 0.01, 0.001),
-  nrounds = c(50, 100, 500),
-  max_depth = 10,
-  min_child_weight = 70,
-  subsample = 0.2
-)
-
-# Ajustar el modelo de boosting
-modelo3 <- xgboost(data = as.matrix(X), label = y, objective = "reg:linear", nthread = -1,
-                   eta = tunegrid_xgboost$eta, nrounds = tunegrid_xgboost$nrounds,
-                   max_depth = tunegrid_xgboost$max_depth, min_child_weight = tunegrid_xgboost$min_child_weight,
-                   subsample = tunegrid_xgboost$subsample, eval_metric = "rmse")
+# Exportar datos para Kaggle
+results_9 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_boost_cop)
+write.csv(results_9, file = "../outputs/predicciones_9.csv", row.names = FALSE)
 
 
-  
 
-# Notas: No sé por qué no me funcionó, revisar
+
+
 
 #______________________________________
 # Notas generales: 
@@ -415,19 +387,17 @@ modelo3 <- xgboost(data = as.matrix(X), label = y, objective = "reg:linear", nth
 
 # 3. Completar la parte de autocorrelacion espacial (Elastic net), ya que es logico que haya autocorrelacion
 
-# 3. Mejorar los modelos consiste en cambiar los hiperparametros de cada modelo, añadir o mejorar variables, encontrar
-# el numero optimo de particion entre train y test para que mejore la prediccion fuera de muestra pero que no se demore tanto,
+# 3. Mejorar los modelos consiste en cambiar los hiperparámetros de cada modelo, añadir o mejorar variables, encontrar
+# el numero óptimo de partición entre train y test para que mejore la predicción fuera de muestra pero que no se demore tanto,
 # eso toca a ojo.
 
-# 4. Entender muy bien el significado de cada hiperparametro en cada modelo para explicar por que seleccionamos los nuestros 
+# 4. Entender muy bien el significado de cada hiperparámetro en cada modelo para explicar por que seleccionamos los nuestros 
 # en el doc
 
 # 5. Si queda tiempo, se pueden probar otros modelos, tomando como base: 
 # https://topepo.github.io/caret/available-models.html
 
 # 6. Si nos sigue sobrando tiempo, probar ridge y lasso
-
-
 
 
 
