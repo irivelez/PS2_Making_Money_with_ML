@@ -270,14 +270,20 @@ plot(modelo_ranger2)
 y_hat_outsample_ranger2 <- predict(modelo_ranger2, base_fin_test)
 y_hat_outsample_ranger2_cop <- exp(y_hat_outsample_ranger2)
 
+# Outsample
+MAE(y_pred = y_hat_outsample_ranger2, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_ranger2_cop, y_true = base_fin_test$price)
+MAPE(y_pred = y_hat_outsample_ranger2, y_true = base_fin_test$ln_price)
+
 results_5 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger2_cop)
 write.csv(results_5, file = "../outputs/predicciones_5.csv", row.names = FALSE)
+
 
 ## Modelo Ranger 3
 # Grid
 tungrid_rf <- expand.grid(
-  min.node.size=c(10,20,30,40,50,70),
-  mtry=c(10,12,15),
+  min.node.size=c(10,20,30,40),
+  mtry=c(8,9,10),
   splitrule=c("variance")
 )
 
@@ -300,6 +306,11 @@ plot(modelo_ranger3)
 y_hat_outsample_ranger3 <- predict(modelo_ranger3, base_fin_test)
 y_hat_outsample_ranger3_cop <- exp(y_hat_outsample_ranger3)
 
+# Outsample
+MAE(y_pred = y_hat_outsample_ranger3, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_ranger3_cop, y_true = base_fin_test$price)
+MAPE(y_pred = y_hat_outsample_ranger3, y_true = base_fin_test$ln_price)
+
 results_7 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_ranger3_cop)
 write.csv(results_7, file = "../outputs/predicciones_7.csv", row.names = FALSE)
 
@@ -309,7 +320,8 @@ write.csv(results_7, file = "../outputs/predicciones_7.csv", row.names = FALSE)
 
 
 ## RPart Model ####
-# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
+# Este modelo se entrenó con el 40% de los datos para ahorrar tiempo
+set.seed(7865)
 modelo_rpart <- train(
   ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
     parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
@@ -325,7 +337,7 @@ modelo_rpart <- train(
 ## Evaluar modelo RPart
 y_hat_insample_rpart <- predict(modelo_rpart,train_df)
 y_hat_outsample_rpart <- predict(modelo_rpart, base_fin_test)
-y_hat_outsample_rpart_cop <- exp(y_hat_outsample_rpar)
+y_hat_outsample_rpart_cop <- exp(y_hat_outsample_rpart)
 
 # Insample
 MAE(y_pred = y_hat_insample_rpart, y_true = train_df$ln_price)
@@ -333,9 +345,9 @@ MAPE(y_pred = y_hat_insample_rpart, y_true = train_df$ln_price)
 
 # Outsample
 MAE(y_pred = y_hat_outsample_rpart, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_rpart_cop, y_true = base_fin_test$price)
 MAPE(y_pred = y_hat_outsample_rpart, y_true = base_fin_test$ln_price)
 
-# Exportar datos para Kaggle
 results_8 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_rpart_cop)
 write.csv(results_8, file = "../outputs/predicciones_8.csv", row.names = FALSE)
 
@@ -346,6 +358,8 @@ install.packages("/Users/irina/Downloads/h2o_3.40.0.4.tgz", repos = NULL, type =
 library(h2o)
 h2o.init(nthreads = 5)
 
+# Modelo 1
+set.seed(9873)
 tunegrid_gbm <- expand.grid(
   learn_rate=c(0.1, 0.01, 0.001),
   ntrees= c(50,100,500),
@@ -354,7 +368,7 @@ tunegrid_gbm <- expand.grid(
   col_sample_rate=0.2
 )
 
-# Este modelo se entrenó con el 30% de los datos para ahorrar tiempo
+# Este modelo se entrenó con el 40% de los datos para ahorrar tiempo
 modelo3 <- train(
   ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
     parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
@@ -381,10 +395,80 @@ MAE(y_pred = y_hat_outsample_boost, y_true = base_fin_test$ln_price)
 MAE(y_pred = y_hat_outsample_boost_cop, y_true = base_fin_test$price)
 MAPE(y_pred = y_hat_outsample_boost, y_true = base_fin_test$ln_price)
 
-# Exportar datos para Kaggle
+# Exportar
 results_9 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_boost_cop)
 write.csv(results_9, file = "../outputs/predicciones_9.csv", row.names = FALSE)
 
+# Modelo 2
+set.seed(9856)
+tunegrid_gbm <- expand.grid(
+  learn_rate = c(0.001),
+  ntrees = c(1000),
+  max_depth = 6,
+  min_rows = 70,
+  col_sample_rate = 0.2
+)
+
+modelo4 <- train(
+  ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
+    parqueaderoT + ascensorT + bañoprivado + balcon + vista + remodelado +
+    Es_apartamento + distancia_parque + area_parque + distancia_sport_centre +
+    distancia_swimming_pool,
+  data = train_df,
+  method = "gbm_h2o",
+  trControl = block_folds,
+  metric='RMSE',
+  tuneGrid=tunegrid_gbm
+)
+
+## Evaluar modelo Boosting
+y_hat_insample_boost2 <- predict(modelo4,train_df)
+y_hat_outsample_boost2 <- predict(modelo4, base_fin_test)
+y_hat_outsample_boost2_cop <- exp(y_hat_outsample_boost2)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_boost2, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_boost2_cop, y_true = base_fin_test$price)
+
+# Exportar
+results_11 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_boost2_cop)
+write.csv(results_11, file = "../outputs/predicciones_11.csv", row.names = FALSE)
+
+
+## Elastic Net ####
+set.seed(9873)
+EN <- train(ln_price ~ surface_covered_new + rooms + bedrooms + bathrooms +
+            parqueaderoT + ascensorT + bañoprivado + balcon+vista + remodelado +
+            Es_apartamento + distancia_parque + area_parque + distancia_sport_centre +
+            distancia_swimming_pool,
+          data=train_df,
+          method = 'glmnet', 
+          trControl = block_folds,
+          tuneGrid = expand.grid(alpha =seq(0,1,length.out = 20),
+                                 lambda = seq(0.001,0.2,length.out = 50))
+) 
+
+plot(EN)
+
+## Evaluar modelo LM
+y_hat_insample_EN <- predict(EN,train_df)
+y_hat_insample_EN_cop <- exp(y_hat_insample_EN)
+
+y_hat_outsample_EN <- predict(EN,base_fin_test)
+y_hat_outsample_EN_cop <- exp(y_hat_outsample_EN)
+
+# Insample
+MAE(y_pred = y_hat_insample_EN, y_true = train_df$ln_price)
+MAE(y_pred = y_hat_insample_EN_cop, y_true = train_df$price)
+
+# Outsample
+MAE(y_pred = y_hat_outsample_EN, y_true = base_fin_test$ln_price)
+MAE(y_pred = y_hat_outsample_EN_cop, y_true = base_fin_test$price)
+MAPE(y_pred = y_hat_outsample_EN, y_true = base_fin_test$ln_price)
+
+# Exportar
+results_10 <- data.frame(property_id = base_fin_test$property_id, price = y_hat_outsample_EN_cop)
+write.csv(results_10, "../outputs/predicciones_10.csv", row.names = FALSE)
 
 
 
@@ -411,10 +495,4 @@ write.csv(results_9, file = "../outputs/predicciones_9.csv", row.names = FALSE)
 # https://topepo.github.io/caret/available-models.html
 
 # 6. Si nos sigue sobrando tiempo, probar ridge y lasso
-
-
-
-
-
-
 
