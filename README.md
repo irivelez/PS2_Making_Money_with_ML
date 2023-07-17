@@ -2,10 +2,10 @@ Problem set 2: Making Money with ML?
 
 Integrantes:
 
-Irina Andrea Vélez López
-Miguel Angel Victoria Simbaqueva
-Lucia Fillippo
-Daniel Casas Bautista
+-- Irina Andrea Vélez López
+-- Miguel Angel Victoria Simbaqueva
+-- Lucia Fillippo
+-- Daniel Casas Bautista
 
 En el presente repositorio se encuentran las siguientes carpetas con la respectiva descripción:
 
